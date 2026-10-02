@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DANFE Reforma Tributária NT 2026.010 — Gerador local XML → DANFE</title>
+<meta name="description" content="Gere o DANFE no novo layout da Reforma Tributária (NT 2026.010 v1.00): bloco Total IBS/CBS/IS, cClassTrib, alíquotas e valores por item, CRT do emitente. 100% local, pronto para GitHub Pages. Produção em 01/12/2026.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230f2a4a'/><text x='50' y='68' font-size='48' text-anchor='middle' fill='white' font-family='Arial' font-weight='bold'>D</text></svg>">
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.8.0/dist/JsBarcode.all.min.js"></script>
+</head>
+<body>
+<a class="skip" href="#conversor">Pular para o conversor</a>
+
+<header class="corp-bar">
+  <div class="corp-inner">
+    <div class="corp-brand">
+      <div class="corp-logo">D</div>
+      <div>
+        <strong>DANFE · Reforma Tributária</strong>
+        <small>NT 2026.010 v1.00 &nbsp;•&nbsp; NF-e modelo 55 &nbsp;•&nbsp; Produção em 01/12/2026</small>
+      </div>
+    </div>
+    <nav class="corp-nav">
+      <a href="#conversor">Converter</a>
+      <a href="#layout">Novo layout</a>
+      <a href="#base-legal">Base legal</a>
+      <a href="#faq">FAQ</a>
+      <button class="btn-corp" id="btnTopConvert">Gerar DANFE</button>
+    </nav>
+  </div>
+</header>
+
+<section class="corp-hero">
+  <div class="corp-inner hero-grid">
+    <div>
+      <span class="pill">Novo layout do DANFE · IBS + CBS + IS · CRT</span>
+      <h1>XML → DANFE no layout da <span class="hl">Reforma Tributária</span></h1>
+      <p class="sub">Leitura <strong>100% local</strong> do XML autorizado e renderização fiel ao novo leiaute: <strong>bloco Total do IBS/CBS/IS</strong>, por item <strong>cClassTrib, base, alíquotas e valores de IBS e CBS + Imposto Seletivo</strong>, e <strong>CRT do emitente</strong>. Imprima ou salve em PDF pelo navegador.</p>
+      <div class="hero-actions">
+        <button class="btn-corp big" id="btnPickTop">Selecionar XML autorizado</button>
+        <button class="btn-ghostl" id="btnSampleTop">Baixar XML de exemplo (com IBS/CBS/IS)</button>
+      </div>
+      <div class="vigencia">📍 <strong>Vigência:</strong> implantação em produção do novo leiaute em <strong>01/12/2026</strong> (NT 2026.010 v1.00). XMLs anteriores sem IBS/CBS/IS continuam válidos e são indicados como “sem valores da Reforma”.</div>
+    </div>
+    <div class="hero-card">
+      <div class="hero-card-head">Checklist NT 2026.010</div>
+      <ul>
+        <li><b>✔</b> Bloco <b>Total do IBS / CBS / IS</b> após o cálculo do ICMS</li>
+        <li><b>✔</b> Itens com <b>cClassTrib + CST + BC + alíquota + valor</b> (IBS, CBS e IS)</li>
+        <li><b>✔</b> <b>CRT do emitente</b> ao lado do CNPJ/IE</li>
+        <li><b>✔</b> Chave 44 + <b>barcode CODE-128C</b> + protocolo</li>
+        <li><b>✔</b> Faixas <b>HOMOLOGAÇÃO / CONTINGÊNCIA / SEM PROTOCOLO</b></li>
+        <li><b>✔</b> Lote, impressão e <b>CSV de conferência</b></li>
+      </ul>
+      <div class="hero-note">Nada sai do seu computador. O DANFE é auxiliar — a validade é do XML autorizado.</div>
+    </div>
+  </div>
+</section>
+
+<main class="corp-inner">
+  <section class="panel" id="conversor">
+    <div class="dropzone" id="dropzone" role="button" tabindex="0" aria-label="Arraste o XML aqui ou clique para selecionar">
+      <div class="dz-icon">📄</div>
+      <h2>Arraste o XML autorizado aqui</h2>
+      <p>NF-e modelo 55 (infNFe) · .xml até 5 MB · lote de até 100 · funciona com <code>file://</code> local</p>
+      <div class="dz-actions no-print">
+        <button class="btn-corp" id="btnPick" type="button">Selecionar XML</button>
+        <button class="btn-line" id="btnSample" type="button">XML de exemplo Reforma</button>
+        <button class="btn-line" id="btnClear" type="button">Limpar</button>
+      </div>
+      <input type="file" id="fileInput" accept=".xml,text/xml,application/xml" multiple hidden>
+    </div>
+    <p class="fine">Fidelidade ao XML: só é impresso o que consta no arquivo. Sem <code>protNFe</code> → <b>SEM PROTOCOLO</b>. <code>tpAmb=2</code> → <b>SEM VALOR FISCAL</b>. <code>tpEmis≠1</code> → faixa de <b>contingência</b>. Sem grupos da Reforma → bloco indica ausência (normal antes de 01/12/2026).</p>
+
+    <div class="lote-bar no-print" id="loteBar" hidden>
+      <strong id="loteInfo">0 documento(s)</strong>
+      <span class="sp"></span>
+      <button class="btn-line sm" id="btnCsv" type="button">📊 CSV</button>
+      <button class="btn-line sm" id="btnPrintAll" type="button">🖨 Imprimir todos</button>
+    </div>
+    <div class="lote-list no-print" id="loteList"></div>
+
+    <div class="doc-nav no-print" id="docNav" hidden>
+      <button class="btn-line sm" id="btnPrev" type="button">← Anterior</button>
+      <strong id="docPos">1 / 1</strong>
+      <button class="btn-line sm" id="btnNext" type="button">Próximo →</button>
+      <span class="sp"></span>
+      <button class="btn-corp sm" id="btnPrint" type="button">🖨 Imprimir / Salvar PDF</button>
+    </div>
+
+    <div id="danfeArea" aria-live="polite">
+      <div class="empty" id="danfeEmpty">Nenhum XML carregado. Selecione um arquivo para ver o DANFE no novo layout empresarial abaixo — antes de publicar no GitHub, teste localmente com duplo clique em <code>index.html</code>.</div>
+      <div id="danfePaper" hidden></div>
+    </div>
+  </section>
+
+  <section class="panel" id="layout">
+    <h2>O que mudou no DANFE (NT 2026.010 v1.00)</h2>
+    <p class="lead">Publicada com o leiaute que demonstra IBS, CBS e Imposto Seletivo no DANFE da NF-e modelo 55.</p>
+    <div class="grid3">
+      <div class="feat"><h3>🧾 Novo bloco de totais</h3><p><b>Total do IBS / CBS / IS</b> em quadro próprio após o cálculo do ICMS: valores de IBS (UF + Município), CBS e IS totalizados do XML (grupo de totais W03 / IBSCBS).</p></div>
+      <div class="feat"><h3>📦 Itens detalhados</h3><p>Cada item passa a exibir <b>cClassTrib, CST do IBS/CBS, base de cálculo, alíquotas e valores de IBS e CBS</b>, além dos <b>campos do Imposto Seletivo</b> (BC, alíquota e valor) quando existirem.</p></div>
+      <div class="feat"><h3>🏢 CRT do emitente</h3><p>O DANFE passa a demonstrar o <b>Código do Regime Tributário (CRT)</b> do emitente junto a CNPJ e IE — essencial na transição da Reforma.</p></div>
+    </div>
+  </section>
+
+  <section class="panel" id="base-legal">
+    <h2>Base legal</h2>
+    <div class="grid2">
+      <div class="feat"><h3>DANFE — Ajuste SINIEF 07/05 + MOC NF-e v7 Anexo III</h3><p>Documento auxiliar: chave de 44 dígitos + barcode CODE-128C, protocolo de autorização, ambiente, contingência, emitente/destinatário, fatura, ICMS, transporte, itens, ISSQN e dados adicionais. Fonte mínima 6pt, A4 retrato.</p></div>
+      <div class="feat"><h3>Reforma — EC 132/2023 · LC 214/2025 · NT 2026.010 v1.00</h3><p>NT 2026.010 v1.00 apresenta como <b>IBS, CBS e IS</b> serão demonstrados no DANFE. <b>Implantação em produção: 01/12/2026.</b> Em 2026 a apuração segue caráter de teste/informativo quando indicada; a obrigatoriedade plena acompanha o cronograma da transição.</p></div>
+    </div>
+    <div class="alert">DANFE não tem valor fiscal isolado. A validade jurídica é do <b>XML autorizado</b> (guarde por 5 anos). Consulte pela chave em <b>nfe.fazenda.gov.br/portal</b>. Divergência entre DANFE e XML: vale o XML.</div>
+  </section>
+
+  <section class="panel" id="faq">
+    <h2>Perguntas frequentes</h2>
+    <details open><summary>Funciona abrindo o arquivo localmente (file://)?</summary><p>Sim. É só HTML + CSS + JS, sem servidor e sem build. Dê duplo clique em <code>index.html</code>. A única dependência de rede é o JsBarcode (CDN) para o código de barras — com internet ele renderiza; sem internet a chave sai em texto.</p></details>
+    <details><summary>Como publico no GitHub Pages?</summary><p>Crie um repositório, suba esta pasta na raiz, ative <i>Settings → Pages → Deploy from branch → main → /(root)</i> e acesse a URL. Inclua o <code>.nojekyll</code> (já incluso).</p></details>
+    <details><summary>Meu XML não tem IBS/CBS/IS. Está errado?</summary><p>Não. Antes da obrigatoriedade (produção do novo leiaute em 01/12/2026) ou em emitente ainda em adaptação, a ausência é normal. O DANFE sinaliza “sem valores da Reforma no XML”.</p></details>
+    <details><summary>Como salvo em PDF?</summary><p>Com o DANFE na tela, clique em <b>Imprimir / Salvar PDF</b> e escolha “Salvar como PDF”. A impressão sai em A4, só o DANFE.</p></details>
+  </section>
+
+  <footer class="foot">© 2026 DANFE Reforma NT 2026.010 · Gerador local e open-source · Layout conforme Ajuste SINIEF 07/05, MOC NF-e v7 e NT 2026.010 v1.00 · Sem valor fiscal isolado.</footer>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>

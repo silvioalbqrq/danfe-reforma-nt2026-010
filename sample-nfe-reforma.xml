@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- EXEMPLO NT 2026.010 v1.00 — homologação, SEM VALOR FISCAL. Use "Selecionar XML" com este arquivo. -->
+<nfeProc versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe">
+<NFe><infNFe Id="NFe35260912345678000195550010000004561000004561">
+<ide><cUF>35</cUF><natOp>VENDA DE MERCADORIA</natOp><mod>55</mod><serie>1</serie><nNF>456</nNF><dhEmi>2026-11-20T10:00:00-03:00</dhEmi><tpNF>1</tpNF><tpAmb>2</tpAmb><tpEmis>1</tpEmis><finNFe>1</finNFe></ide>
+<emit><CNPJ>12345678000195</CNPJ><xNome>EMPRESA EXEMPLO LTDA</xNome><IE>123456789</IE><CRT>3</CRT><enderEmit><xLgr>RUA DAS PALMEIRAS</xLgr><nro>100</nro><xBairro>CENTRO</xBairro><xMun>SAO PAULO</xMun><UF>SP</UF><CEP>01001000</CEP><fone>1133334444</fone></enderEmit></emit>
+<dest><CNPJ>98765432000110</CNPJ><xNome>CLIENTE EXEMPLO SA</xNome><IE>987654321</IE><enderDest><xLgr>AV BRASIL</xLgr><nro>200</nro><xBairro>CENTRO</xBairro><xMun>RIO DE JANEIRO</xMun><UF>RJ</UF><CEP>20010000</CEP></enderDest></dest>
+<det nItem="1"><prod><cProd>001</cProd><xProd>NOTEBOOK CORPORATIVO 14pol</xProd><NCM>84713000</NCM><CFOP>5102</CFOP><uCom>UN</uCom><qCom>2.0000</qCom><vUnCom>3500.0000</vUnCom><vProd>7000.00</vProd></prod><imposto><ICMS><ICMS00><CST>00</CST><vBC>7000.00</vBC><pICMS>18.00</pICMS><vICMS>1260.00</vICMS></ICMS00></ICMS><UB><CST>000</CST><cClassTrib>000001</cClassTrib><gIBSCBS><vBC>7000.00</vBC><gIBSUF><pIBSUF>0.10</pIBSUF><vIBSUF>7.00</vIBSUF></gIBSUF><gIBSMun><pIBSMun>0.00</pIBSMun><vIBSMun>0.00</vIBSMun></gIBSMun><gCBS><pCBS>0.90</pCBS><vCBS>63.00</vCBS></gCBS></gIBSCBS></UB><IS><CSTIS>00</CSTIS><vBCIS>7000.00</vBCIS><pIS>0.00</pIS><vIS>0.00</vIS></IS></imposto></det>
+<det nItem="2"><prod><cProd>002</cProd><xProd>REFRIGERANTE LATA 350ML CX C/12 (IS)</xProd><NCM>22021000</NCM><CFOP>5102</CFOP><uCom>CX</uCom><qCom>10.0000</qCom><vUnCom>60.0000</vUnCom><vProd>600.00</vProd></prod><imposto><ICMS><ICMS00><CST>00</CST><vBC>600.00</vBC><pICMS>18.00</pICMS><vICMS>108.00</vICMS></ICMS00></ICMS><UB><CST>000</CST><cClassTrib>000002</cClassTrib><gIBSCBS><vBC>600.00</vBC><gIBSUF><pIBSUF>0.10</pIBSUF><vIBSUF>0.60</vIBSUF></gIBSUF><gCBS><pCBS>0.90</pCBS><vCBS>5.40</vCBS></gCBS></gIBSCBS></UB><IS><CSTIS>10</CSTIS><vBCIS>600.00</vBCIS><pIS>5.00</pIS><vIS>30.00</vIS></IS></imposto></det>
+<total><ICMSTot><vBC>7600.00</vBC><vICMS>1368.00</vICMS><vProd>7600.00</vProd><vFrete>0.00</vFrete><vNF>7600.00</vNF><vTotTrib>1500.00</vTotTrib></ICMSTot><W03><vIBS>7.60</vIBS><vCBS>68.40</vCBS><vIS>30.00</vIS></W03></total>
+<transp><modFrete>9</modFrete></transp>
+<infAdic><infCpl>AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL. NT 2026.010 v1.00 - demonstracao IBS/CBS/IS.</infCpl></infAdic>
+</infNFe></NFe>
+<protNFe><infProt><nProt>135260000000001</nProt><dhRecbto>2026-11-20T10:01:00-03:00</dhRecbto><chNFe>35260912345678000195550010000004561000004561</chNFe></infProt></protNFe>
+</nfeProc>

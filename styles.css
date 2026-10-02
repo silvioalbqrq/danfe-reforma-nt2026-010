@@ -1,0 +1,121 @@
+:root{
+  --navy:#0f2a4a; --navy2:#163a63; --ink:#1a2b3c; --mut:#5b6b7f;
+  --line:#d7dee7; --paper:#ffffff; --bg:#eef1f5; --green:#0e7a4f;
+  --greenbg:#e7f6ee; --amber:#92400e; --amberbg:#fef3c7; --red:#b91c1c; --redbg:#fee2e2;
+  --radius:14px;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;font-family:"Segoe UI",Roboto,Arial,Helvetica,sans-serif;background:var(--bg);color:var(--ink);line-height:1.55}
+.skip{position:absolute;left:-999px;background:#fff;padding:8px 12px;z-index:99}
+.skip:focus{left:8px;top:8px}
+code{background:#eef2f7;padding:1px 6px;border-radius:6px;font-size:.9em}
+/* Topo empresarial */
+.corp-bar{background:linear-gradient(180deg,var(--navy),var(--navy2));color:#fff;position:sticky;top:0;z-index:40;border-bottom:3px solid #c9a227}
+.corp-inner{max-width:1180px;margin:0 auto;padding:0 18px}
+.corp-bar .corp-inner{display:flex;align-items:center;justify-content:space-between;gap:14px;padding-top:10px;padding-bottom:10px}
+.corp-brand{display:flex;gap:12px;align-items:center}
+.corp-logo{width:44px;height:44px;border-radius:10px;background:#fff;color:var(--navy);display:grid;place-items:center;font-weight:900;font-size:24px}
+.corp-brand strong{font-size:17px;display:block;line-height:1.2}
+.corp-brand small{color:#cbd5e1;font-size:11.5px}
+.corp-nav{display:flex;gap:14px;align-items:center}
+.corp-nav a{color:#dbe6f3;text-decoration:none;font-size:14px}
+.corp-nav a:hover{color:#fff;text-decoration:underline}
+.btn-corp{background:#c9a227;color:#231a00;border:0;border-radius:9px;padding:10px 16px;font-weight:800;cursor:pointer}
+.btn-corp:hover{filter:brightness(1.06)}
+.btn-corp.big{font-size:16px;padding:13px 20px}
+.btn-corp.sm,.btn-line.sm{padding:7px 12px;font-size:13px}
+.btn-ghostl{background:transparent;color:#fff;border:1px solid #5b7ba3;border-radius:9px;padding:12px 16px;cursor:pointer}
+.btn-line{background:#fff;border:1px solid var(--line);border-radius:9px;padding:10px 14px;cursor:pointer;font-weight:700;color:var(--ink)}
+.btn-line:hover{border-color:var(--navy)}
+/* Hero */
+.corp-hero{background:linear-gradient(180deg,#0f2a4a,#1b4a7e 70%,#eef1f5 70%);color:#fff;padding:30px 0 0}
+.hero-grid{display:grid;grid-template-columns:1.4fr .9fr;gap:22px;padding-bottom:26px}
+.pill{display:inline-block;background:#c9a227;color:#231a00;font-weight:800;font-size:12px;padding:6px 12px;border-radius:999px;text-transform:uppercase;letter-spacing:.4px}
+.corp-hero h1{font-size:clamp(26px,4vw,40px);margin:12px 0 8px;line-height:1.12}
+.hl{color:#f5d76e}
+.sub{color:#d6e3f2;max-width:640px;margin:0}
+.hero-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+.vigencia{margin-top:14px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);border-radius:10px;padding:10px 12px;font-size:13.5px;color:#fff}
+.hero-card{background:#fff;color:var(--ink);border-radius:var(--radius);padding:18px;box-shadow:0 12px 30px rgba(0,0,0,.25)}
+.hero-card-head{font-weight:900;text-transform:uppercase;font-size:12px;letter-spacing:.5px;color:var(--navy);border-bottom:2px solid #c9a227;padding-bottom:8px;margin-bottom:8px}
+.hero-card ul{margin:0;padding-left:18px;font-size:14px}
+.hero-card li{margin:6px 0}
+.hero-note{margin-top:10px;font-size:12.5px;color:var(--mut);background:#f4f6f9;border-radius:8px;padding:8px 10px}
+/* Painéis */
+.panel{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:20px;margin:18px 0}
+.panel h2{margin:0 0 6px;color:var(--navy)}
+.lead{color:var(--mut);margin:0 0 12px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.feat{border:1px solid var(--line);border-radius:10px;padding:14px;background:#f8fafc}
+.feat h3{margin:0 0 6px;font-size:15.5px}
+.feat p{margin:0;font-size:14px;color:#3c4c60}
+.alert{background:#fffbeb;border:1px solid #fcd34d;border-radius:10px;padding:12px;margin-top:12px;font-size:14px}
+details{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:10px;background:#f8fafc}
+summary{cursor:pointer;font-weight:800}
+.foot{color:var(--mut);font-size:12.5px;text-align:center;padding:14px 0 22px}
+/* Conversor */
+.dropzone{border:2px dashed var(--navy2);border-radius:var(--radius);background:#f4f7fb;text-align:center;padding:28px 16px;cursor:pointer}
+.dropzone:hover,.dropzone.over{border-color:#c9a227;background:#fff8e1}
+.dz-icon{font-size:36px}
+.dropzone h2{margin:6px 0 4px}
+.dropzone p{margin:0;color:var(--mut);font-size:14px}
+.dz-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:14px}
+.fine{font-size:12.5px;color:var(--mut);text-align:center}
+.lote-bar{display:flex;gap:10px;align-items:center;background:#f4f7fb;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:12px}
+.sp{flex:1}
+.lote-list{display:grid;gap:8px;margin-top:10px}
+.lote-item{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:13px;background:#fff;cursor:pointer;text-align:left;width:100%}
+.lote-item.active{border-color:var(--navy);box-shadow:0 0 0 2px #c9a22755}
+.lote-item .n{font-weight:900;background:var(--navy);color:#fff;border-radius:8px;min-width:34px;text-align:center;padding:4px 6px}
+.badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:800}
+.b-ok{background:#dcfce7;color:#166534}.b-warn{background:#fef3c7;color:#92400e}.b-err{background:#fee2e2;color:#991b1b}.b-info{background:#e0f2fe;color:#075985}
+.doc-nav{display:flex;gap:10px;align-items:center;margin:14px 0}
+.empty{background:#f8fafc;border:1px dashed var(--line);border-radius:10px;padding:26px;text-align:center;color:var(--mut)}
+
+/* ===== DANFE papel A4 empresarial ===== */
+#danfePaper{background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:0;overflow:hidden}
+.danfe{font-family:Arial,Helvetica,sans-serif;color:#000;font-size:11px;max-width:800px;margin:0 auto;background:#fff;padding:10px 12px}
+.d-canhoto{display:flex;border:1px solid #000;margin-bottom:4px;font-size:8.5px}
+.d-canhoto .t{flex:1;padding:3px 5px}
+.d-canhoto .nf{width:150px;border-left:1px solid #000;text-align:center;font-weight:bold;font-size:12px;padding:2px}
+.d-row{display:flex;border:1px solid #000;border-top:0}
+.d-row.first{border-top:1px solid #000}
+.d-cell{border-left:1px solid #000;padding:2px 4px;position:relative}
+.d-cell:first-child{border-left:0}
+.d-lab{font-size:7px;text-transform:uppercase;color:#000;display:block;line-height:1.2}
+.d-val{font-size:10.5px;font-weight:bold;line-height:1.25;word-break:break-word}
+.d-val.norm{font-weight:normal}
+.d-sec{background:#1f3a5f;color:#fff;font-weight:bold;font-size:9px;padding:3px 6px;text-transform:uppercase;letter-spacing:.3px;margin-top:5px;border:1px solid #1f3a5f}
+.d-sec.gold{background:#8a6d00;border-color:#8a6d00}
+.d-sec.green{background:#0e7a4f;border-color:#0e7a4f}
+.d-key{font-size:12px;letter-spacing:1px}
+.d-bar{text-align:center;padding:2px}
+.d-bar svg,.d-bar canvas{max-width:100%;height:52px}
+.stripe{padding:5px 8px;font-weight:bold;font-size:10px;text-align:center;border:1px solid #000;border-top:0}
+.stripe.hom{background:#fee2e2;color:#991b1b;font-size:12px}
+.stripe.cont{background:#fef3c7;color:#92400e}
+.stripe.noprot{background:#000;color:#fff}
+table.d-itens{width:100%;border-collapse:collapse;margin-top:0;font-size:8.5px}
+table.d-itens th{background:#eef2f7;border:1px solid #000;font-size:7px;padding:3px;text-transform:uppercase}
+table.d-itens td{border:1px solid #000;padding:3px;vertical-align:top}
+tr.reforma td{background:#f2fbf6;font-size:8px}
+.tag{display:inline-block;background:#0e7a4f;color:#fff;border-radius:4px;padding:0 4px;font-size:7.5px;font-weight:bold;margin-right:3px}
+.tag.cbs{background:#1d4ed8}.tag.is{background:#7c3aed}.tag.crt{background:#8a6d00}
+.d-tot-reforma{display:flex;border:1px solid #000;border-top:0}
+.d-tot-reforma div{flex:1;border-left:1px solid #000;padding:4px;text-align:center}
+.d-tot-reforma div:first-child{border-left:0}
+.d-tot-reforma .v{font-size:13px;font-weight:900}
+.d-foot{font-size:7.5px;color:#333;margin-top:6px;display:flex;justify-content:space-between;border-top:1px solid #000;padding-top:4px}
+
+@media(max-width:900px){.hero-grid,.grid3,.grid2{grid-template-columns:1fr}.corp-nav a{display:none}}
+@media print{
+  body{background:#fff}
+  .corp-bar,.corp-hero,.panel#layout,.panel#base-legal,.panel#faq,.foot,.dropzone,.fine,.lote-bar,.lote-list,.doc-nav,.empty,.no-print{display:none!important}
+  .corp-inner{max-width:none;padding:0}
+  .panel{border:0;margin:0;padding:0}
+  #danfePaper{border:0}
+  .danfe{max-width:none;padding:0}
+  .danfe-print-all .danfe{page-break-after:always}
+}
