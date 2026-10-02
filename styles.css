@@ -25,18 +25,19 @@ code{background:#eef2f7;padding:1px 6px;border-radius:6px;font-size:.9em}
 .btn-corp:hover{filter:brightness(1.06)}
 .btn-corp.big{font-size:16px;padding:13px 20px}
 .btn-corp.sm,.btn-line.sm{padding:7px 12px;font-size:13px}
-.btn-ghostl{background:transparent;color:#fff;border:1px solid #5b7ba3;border-radius:9px;padding:12px 16px;cursor:pointer}
+.btn-ghostl{background:#fff;color:var(--navy);border:1px solid #fff;border-radius:9px;padding:12px 16px;cursor:pointer;font-weight:700}
+.btn-ghostl:hover{background:#e8eef5}
 .btn-line{background:#fff;border:1px solid var(--line);border-radius:9px;padding:10px 14px;cursor:pointer;font-weight:700;color:var(--ink)}
 .btn-line:hover{border-color:var(--navy)}
 /* Hero */
-.corp-hero{background:linear-gradient(180deg,#0f2a4a,#1b4a7e 70%,#eef1f5 70%);color:#fff;padding:30px 0 0}
+.corp-hero{background:linear-gradient(180deg,#0f2a4a,#1b4a7e);color:#fff;padding:30px 0 30px}
 .hero-grid{display:grid;grid-template-columns:1.4fr .9fr;gap:22px;padding-bottom:26px}
 .pill{display:inline-block;background:#c9a227;color:#231a00;font-weight:800;font-size:12px;padding:6px 12px;border-radius:999px;text-transform:uppercase;letter-spacing:.4px}
 .corp-hero h1{font-size:clamp(26px,4vw,40px);margin:12px 0 8px;line-height:1.12}
 .hl{color:#f5d76e}
 .sub{color:#d6e3f2;max-width:640px;margin:0}
 .hero-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
-.vigencia{margin-top:14px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);border-radius:10px;padding:10px 12px;font-size:13.5px;color:#fff}
+.vigencia{margin-top:14px;background:#fff8e1;border:1px solid #c9a227;border-radius:10px;padding:10px 12px;font-size:13.5px;color:#231a00}
 .hero-card{background:#fff;color:var(--ink);border-radius:var(--radius);padding:18px;box-shadow:0 12px 30px rgba(0,0,0,.25)}
 .hero-card-head{font-weight:900;text-transform:uppercase;font-size:12px;letter-spacing:.5px;color:var(--navy);border-bottom:2px solid #c9a227;padding-bottom:8px;margin-bottom:8px}
 .hero-card ul{margin:0;padding-left:18px;font-size:14px}
