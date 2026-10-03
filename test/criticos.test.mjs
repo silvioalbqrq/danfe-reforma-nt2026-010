@@ -29,6 +29,28 @@ test('harness: a interface do site não roda durante os testes', () => {
   assert.equal(typeof app.parseXML, 'function');
 });
 
+test('Protocolo: número e data saem de protNFe/infProt, não do nível protNFe', () => {
+  const doc = parseXML(nfe({}), 'prot.xml');
+
+  assert.equal(doc.prot.nProt, '135260000000001');
+  assert.match(renderDANFE(doc), /135260000000001/);
+  assert.doesNotMatch(renderDANFE(doc), /SEM PROTOCOLO/);
+});
+
+test('Protocolo ausente mostra SEM PROTOCOLO em vez de "· —"', () => {
+  const semProt = nfe({}).replace(/<protNFe>[\s\S]*<\/protNFe>/, '');
+  const doc = parseXML(semProt, 'semprot.xml');
+
+  assert.equal(doc.prot, null);
+  assert.match(renderDANFE(doc), /SEM PROTOCOLO/);
+});
+
+test('Chave de 44 dígitos só quebra nos pontos, nunca no meio do grupo', () => {
+  const html = renderDANFE(parseXML(nfe({}), 'chave.xml'));
+
+  assert.ok(html.includes('.<wbr>'), 'a chave formatada deve ter oportunidade de quebra após cada ponto');
+});
+
 // ---------------------------------------------------------------------------
 // F1 — o CST do ICMS não pode virar o CST de IBS/CBS
 // ---------------------------------------------------------------------------

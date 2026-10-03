@@ -239,6 +239,10 @@ function parseNFe(xml, name) {
   });
   for (const p of problemasChave) alertas.push({ nivel: 'erro', campo: 'chave', texto: p });
   const protEl = noDoc(xml, 'protNFe');
+  // nProt e dhRecbto moram em <protNFe><infProt>, não como filhos diretos de <protNFe>.
+  // Ler no nível errado deixava o protocolo em branco ("· —") sem acusar SEM PROTOCOLO.
+  const infProt = filhoDe(protEl, 'infProt') || protEl;
+  const nProt = tx(infProt, 'nProt'), dhProt = tx(infProt, 'dhRecbto');
   const eo = eEmit ? { lgr: tx(eEmit, 'xLgr'), nro: tx(eEmit, 'nro'), bairro: tx(eEmit, 'xBairro'), mun: tx(eEmit, 'xMun'), uf: tx(eEmit, 'UF'), cep: tx(eEmit, 'CEP'), fone: tx(eEmit, 'fone') } : {};
   const doo = eDest ? { lgr: tx(eDest, 'xLgr'), nro: tx(eDest, 'nro'), bairro: tx(eDest, 'xBairro'), mun: tx(eDest, 'xMun'), uf: tx(eDest, 'UF'), cep: tx(eDest, 'CEP'), fone: tx(eDest, 'fone') } : {};
   return {
@@ -258,7 +262,7 @@ function parseNFe(xml, name) {
     // anterior juntava os dois no mesmo campo e ainda imprimia um texto fixo da
     // aplicação no lugar do fisco.
     infCpl: tx(infAdic, 'infCpl'), infFisco: tx(infAdic, 'infAdFisco'),
-    prot: protEl ? { nProt: tx(protEl, 'nProt'), dh: tx(protEl, 'dhRecbto') } : null,
+    prot: (nProt || dhProt) ? { nProt, dh: dhProt } : null,
     itens
   };
 }
@@ -272,12 +276,15 @@ function parseXML(text, name) {
 }
 
 /* --- Render DANFE empresarial NT 2026.010 --- */
+/* A chave com pontos só pode quebrar de linha após o ponto, nunca no meio do
+   grupo de 4 dígitos — <wbr> marca os únicos pontos de quebra permitidos. */
+const chaveHtml = c => esc(fmtChave(c)).replace(/\./g, '.<wbr>');
 function barcodeSVG(chave) {
   const c = onlyD(chave);
-  if (c.length !== 44 || typeof JsBarcode === 'undefined') return `<div class="d-key">${esc(fmtChave(chave))}</div>`;
+  if (c.length !== 44 || typeof JsBarcode === 'undefined') return `<div class="d-key">${chaveHtml(chave)}</div>`;
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  try { JsBarcode(svg, c, { format: 'CODE128C', displayValue: false, height: 46, margin: 0 }); } catch { return `<div class="d-key">${esc(fmtChave(chave))}</div>`; }
-  return `<div class="d-bar">${svg.outerHTML}</div><div class="d-key">${esc(fmtChave(chave))}</div>`;
+  try { JsBarcode(svg, c, { format: 'CODE128C', displayValue: false, height: 46, margin: 0 }); } catch { return `<div class="d-key">${chaveHtml(chave)}</div>`; }
+  return `<div class="d-bar">${svg.outerHTML}</div><div class="d-key">${chaveHtml(chave)}</div>`;
 }
 const FRETE = { '0': '0-Remetente', '1': '1-Destinatário', '2': '2-Terceiros', '9': '9-Sem frete' };
 
@@ -340,7 +347,7 @@ function renderDANFE(d) {
       <div class="d-cell" style="width:24%"><span class="d-lab">Inscrição estadual</span><div class="d-val">${esc(d.emit.IE || '')}</div></div>
       <div class="d-cell" style="width:26%"><span class="d-lab">Inscr. estadual subst. trib.</span><div class="d-val">${esc(d.emit.IEST || '')}</div></div>
       <div class="d-cell" style="width:26%"><span class="d-lab">CNPJ / CPF + CRT</span><div class="d-val">${esc(maskDoc(d.emit.doc))} <span class="tag crt">CRT ${esc(d.emit.CRT || '—')}</span></div></div>
-      <div class="d-cell" style="width:24%"><span class="d-lab">Chave (44 dígitos)</span><div class="d-val" style="font-size:8.5px">${esc(fmtChave(d.chave))}</div></div>
+      <div class="d-cell" style="width:24%"><span class="d-lab">Chave (44 dígitos)</span><div class="d-val" style="font-size:8.5px">${chaveHtml(d.chave)}</div></div>
     </div>
     <div class="d-sec">Destinatário / remetente</div>
     <div class="d-row first">

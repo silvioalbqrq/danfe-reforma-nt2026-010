@@ -85,7 +85,7 @@ summary{cursor:pointer;font-weight:800}
 .d-row.first{border-top:1px solid #000}
 .d-cell{border-left:1px solid #000;padding:2px 4px;position:relative}
 .d-cell:first-child{border-left:0}
-.d-lab{font-size:7px;text-transform:uppercase;color:#000;display:block;line-height:1.2}
+.d-lab{font-size:8px;text-transform:uppercase;color:#000;display:block;line-height:1.2}
 .d-val{font-size:10.5px;font-weight:bold;line-height:1.25;word-break:break-word}
 .d-val.norm{font-weight:normal}
 .d-sec{background:#1f3a5f;color:#fff;font-weight:bold;font-size:9px;padding:3px 6px;text-transform:uppercase;letter-spacing:.3px;margin-top:5px;border:1px solid #1f3a5f}
@@ -102,7 +102,7 @@ summary{cursor:pointer;font-weight:800}
 .stripe.aviso{background:#fffbeb;color:#92400e;border:1px dashed #92400e}
 .origem{font-weight:normal;font-size:7px;color:#5b6b7f}
 table.d-itens{width:100%;border-collapse:collapse;margin-top:0;font-size:8.5px}
-table.d-itens th{background:#eef2f7;border:1px solid #000;font-size:7px;padding:3px;text-transform:uppercase}
+table.d-itens th{background:#eef2f7;border:1px solid #000;font-size:8px;padding:3px;text-transform:uppercase}
 table.d-itens td{border:1px solid #000;padding:3px;vertical-align:top}
 tr.reforma td{background:#f2fbf6;font-size:8px}
 .tag{display:inline-block;background:#0e7a4f;color:#fff;border-radius:4px;padding:0 4px;font-size:7.5px;font-weight:bold;margin-right:3px}
@@ -112,6 +112,8 @@ tr.reforma td{background:#f2fbf6;font-size:8px}
 .d-tot-reforma div:first-child{border-left:0}
 .d-tot-reforma .v{font-size:13px;font-weight:900}
 .d-foot{font-size:7.5px;color:#333;margin-top:6px;display:flex;justify-content:space-between;border-top:1px solid #000;padding-top:4px}
+/* Sem isso o navegador corta os fundos ao imprimir e as seções saem claras */
+.d-sec,.stripe,.tag,tr.reforma td{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 
 @media(max-width:900px){.hero-grid,.grid3,.grid2{grid-template-columns:1fr}.corp-nav a{display:none}}
 @media print{
