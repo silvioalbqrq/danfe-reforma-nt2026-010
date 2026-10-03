@@ -287,6 +287,15 @@ function barcodeSVG(chave) {
   return `<div class="d-bar">${svg.outerHTML}</div><div class="d-key">${chaveHtml(chave)}</div>`;
 }
 const FRETE = { '0': '0-Remetente', '1': '1-Destinatário', '2': '2-Terceiros', '9': '9-Sem frete' };
+/* Nome + documento do transportador sem o "— —" quando o XML não traz transportadora. */
+function transpId(t) {
+  const nome = (t && t.tNome) || '', doc = onlyD(t && t.tDoc);
+  if (nome && doc) return `${nome} ${maskDoc(doc)}`;
+  return nome || (doc ? maskDoc(doc) : '—');
+}
+/* O infCpl às vezes traz metadados do emissor entre pipes (|md5: …|). Não é
+   informação fiscal e polui o campo complementar. */
+const limpaInfCpl = s => String(s || '').replace(/\|[^|]*\|/g, ' ').replace(/\s+/g, ' ').trim();
 
 function renderDANFE(d) {
   const eo = d.emit.ender || {}, doo = d.dest.ender || {};
@@ -389,7 +398,7 @@ function renderDANFE(d) {
     <div class="d-sec green">Total do IBS / CBS / IS — Reforma Tributária (NT 2026.010)</div>
     ${blocoReforma}
     <div class="d-sec">Transportador / volumes</div>
-    <div class="d-row first"><div class="d-cell" style="flex:1"><div class="d-val norm">${d.transp ? `${esc(FRETE[d.transp.modFrete] || d.transp.modFrete)} · ${esc(d.transp.tNome || '—')} ${esc(maskDoc(d.transp.tDoc || ''))} · Vols: ${d.transp.vols.map(v => `${esc(v.qVol || '')} ${esc(v.esp || '')}`).join(' | ') || '—'}` : 'Frete conforme XML (sem informação quando em branco).'}</div></div></div>
+    <div class="d-row first"><div class="d-cell" style="flex:1"><div class="d-val norm">${d.transp ? `${esc(FRETE[d.transp.modFrete] || d.transp.modFrete)} · ${esc(transpId(d.transp))} · Vols: ${d.transp.vols.map(v => `${esc(v.qVol || '')} ${esc(v.esp || '')}`).join(' | ') || '—'}` : 'Frete conforme XML (sem informação quando em branco).'}</div></div></div>
     <div class="d-sec gold">Dados dos produtos / serviços + IBS · CBS · IS por item (NT 2026.010)</div>
     <table class="d-itens">
       <thead><tr><th>Cód</th><th>Descrição</th><th>NCM</th><th>CST</th><th>CFOP</th><th>UN</th><th>Qtd</th><th>V.Unit</th><th>V.Total</th><th>BC ICMS</th><th>V.ICMS</th><th>V.IPI</th></tr></thead>
@@ -397,7 +406,7 @@ function renderDANFE(d) {
     </table>
     ${d.iss && (d.iss.vServ || d.iss.vISS) ? `<div class="d-sec">Cálculo do ISSQN</div><div class="d-row first"><div class="d-cell"><div class="d-val">V.Serv ${num2(d.iss.vServ)} · V.ISS ${num2(d.iss.vISS)}</div></div></div>` : ''}
     <div class="d-sec">Dados adicionais</div>
-    <div class="d-row first"><div class="d-cell" style="flex:1"><span class="d-lab">Informações complementares</span><div class="d-val norm">${esc(d.infCpl || '—')}</div></div><div class="d-cell" style="width:180px"><span class="d-lab">Reservado ao fisco</span><div class="d-val norm">${esc(d.infFisco || '—')}</div></div></div>
+    <div class="d-row first"><div class="d-cell" style="flex:1"><span class="d-lab">Informações complementares</span><div class="d-val norm">${esc(limpaInfCpl(d.infCpl) || '—')}</div></div><div class="d-cell" style="width:180px"><span class="d-lab">Reservado ao fisco</span><div class="d-val norm">${esc(d.infFisco || '—')}</div></div></div>
     <div class="d-foot"><span>Gerado localmente a partir do XML · ${esc(d.fileName)} · Impresso em ${new Date().toLocaleString('pt-BR')}</span><span>DANFE — sem valor fiscal isolado · validade no XML autorizado</span></div>
   </div>`;
 }

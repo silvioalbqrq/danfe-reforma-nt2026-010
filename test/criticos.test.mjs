@@ -29,6 +29,22 @@ test('harness: a interface do site não roda durante os testes', () => {
   assert.equal(typeof app.parseXML, 'function');
 });
 
+test('Transporte sem transportadora mostra um "—" só, nunca "— —"', () => {
+  const comTransp = nfe({}).replace('</infNFe>', '<transp><modFrete>9</modFrete></transp></infNFe>');
+  const html = renderDANFE(parseXML(comTransp, 'transp.xml'));
+
+  assert.match(html, /9-Sem frete/);
+  assert.doesNotMatch(html, /— —/);
+});
+
+test('infCpl com metadado |md5| tem o hash filtrado e mantém o texto fiscal', () => {
+  const infAdic = '<infAdic><infCpl>|md5: c212618357429d0628da57d8957dab5c|DOCUMENTO EMITIDO POR ME OU EPP.</infCpl></infAdic>';
+  const html = renderDANFE(parseXML(nfe({ infAdic }), 'hash.xml'));
+
+  assert.doesNotMatch(html, /md5/);
+  assert.match(html, /DOCUMENTO EMITIDO POR ME OU EPP/);
+});
+
 test('Protocolo: número e data saem de protNFe/infProt, não do nível protNFe', () => {
   const doc = parseXML(nfe({}), 'prot.xml');
 
