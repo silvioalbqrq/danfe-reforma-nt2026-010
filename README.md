@@ -20,4 +20,4 @@ Teste rápido: use `sample-nfe-reforma.xml` (homologação, com IBS/CBS/IS).
 - Reforma: EC 132/2023, LC 214/2025, **NT 2026.010 v1.00** — IBS/CBS/IS no DANFE, CRT do emitente.
 - **Produção do novo leiaute: 01/12/2026.** XMLs sem grupos da Reforma são sinalizados como "sem valores da Reforma" (normal antes da vigência).
 
-Parser tolerante a variações de tag (UB/IBSCBS/gIBSCBS, VB/IS/gIS, W03/IBSCBSTot). Só imprime o que consta no XML.
+Parser pelos nomes canônicos da NT (IBSCBS/UB com gIBSCBS, IS, W03/IBSCBSTot). Só imprime o que consta no XML; divergência entre total declarado e soma dos itens, e chave de acesso inválida, geram alerta no DANFE.

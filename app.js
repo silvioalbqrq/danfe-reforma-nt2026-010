@@ -1,7 +1,7 @@
 /* DANFE Reforma NT 2026.010 v1.00 — parser + render empresarial, 100% local
-   Grupos tolerantes a variações de nome (UB/IBSCBS/gIBSCBS, VB/IS/gIS, W03/IBSCBSTot):
+   Grupos lidos pelos nomes canônicos da NT (IBSCBS ou UB com gIBSCBS; IS; W03/IBSCBSTot):
    - item: cClassTrib, CST IBS/CBS, vBC, pIBSUF/pIBSMun/pCBS, vIBSUF/vIBSMun/vCBS, IS: vBCIS/pIS/vIS
-   - totais: soma dos itens quando o grupo de totais não existir
+   - totais: o valor declarado no XML prevalece; divergência contra a soma dos itens vira alerta
    - emit.CRT sempre exibido
 */
 // Em Node (testes) não existe `document`: o seletor devolve null e o bloco de
