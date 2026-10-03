@@ -4,7 +4,9 @@
    - totais: soma dos itens quando o grupo de totais não existir
    - emit.CRT sempre exibido
 */
-const $ = s => document.querySelector(s);
+// Em Node (testes) não existe `document`: o seletor devolve null e o bloco de
+// interface, no fim do arquivo, nem chega a rodar. No navegador é idêntico ao de antes.
+const $ = s => (typeof document === 'undefined' ? null : document.querySelector(s));
 const dropzone = $('#dropzone'), fileInput = $('#fileInput');
 const loteList = $('#loteList'), loteBar = $('#loteBar'), loteInfo = $('#loteInfo');
 const docNav = $('#docNav'), docPos = $('#docPos'), paper = $('#danfePaper'), empty = $('#danfeEmpty');
@@ -22,91 +24,221 @@ function fmtData(iso) { if (!iso || iso === '—') return '—'; const m = Strin
 function fmtHora(iso) { const m = String(iso || '').match(/T(\d{2}:\d{2})/); return m ? m[1] : ''; }
 function fmtNF(n) { const d = onlyD(String(n || '')); if (!d) return '—'; const p = d.padStart(9, '0'); return p.slice(0, 3) + '.' + p.slice(3, 6) + '.' + p.slice(6, 9); }
 
-/* --- XML helpers tolerantes a namespace --- */
-function el1(parent, tag) {
-  if (!parent) return null;
-  try { const l = parent.getElementsByTagName(tag); if (l && l.length) return l[0]; } catch {}
-  try { if (parent.getElementsByTagNameNS) { const l = parent.getElementsByTagNameNS('*', tag); if (l && l.length) return l[0]; } } catch {}
+/* --- Acesso a nós: SEMPRE por filho direto ---
+   `getElementsByTagName` varre a subárvore inteira. Foi essa varredura que produziu
+   dois bugs de número fiscal: o CST do ICMS aparecia impresso como CST de IBS/CBS e a
+   base do IBS/CBS caía na coluna "BC ICMS" — nos dois casos o XML estava certo e a
+   ordem das tags dentro de `<imposto>` decidia o que era lido. Aqui a busca é estrutural:
+   cada grupo é filho direto de outro, como no leiaute da NT.
+   A única busca ampla que sobra é a do documento inteiro, para achar `infNFe`. */
+function noDoc(xml, tag) { const l = xml.getElementsByTagName(tag); return l && l.length ? l[0] : null; }
+const filhosDe = parent => (parent && parent.children ? Array.from(parent.children) : []);
+const filhoDe = (parent, tag) => filhosDe(parent).find(el => el.nodeName === tag) || null;
+const grupoDe = (parent, tags) => { for (const t of tags) { const e = filhoDe(parent, t); if (e) return e; } return null; };
+const primeiroFilhoDe = parent => filhosDe(parent)[0] || null;
+function tx(parent, tag, fb = '') { const e = filhoDe(parent, tag); return e && e.textContent != null ? e.textContent.trim() : fb; }
+function num(parent, ...tags) { for (const t of tags) { const v = numOuNull(parent, t); if (v !== null) return v; } return 0; }
+/* Devolve null quando o campo não existe, para não confundir "ausente" com zero —
+   num documento fiscal, zero inventado é pior que célula em branco. */
+function numOuNull(parent, ...tags) {
+  for (const t of tags) {
+    const e = filhoDe(parent, t);
+    if (e && e.textContent.trim() !== '') { const v = parseFloat(e.textContent.trim().replace(',', '.')); if (!isNaN(v)) return v; }
+  }
   return null;
 }
-function allBy(parent, tag) {
-  if (!parent) return [];
-  try { const l = parent.getElementsByTagName(tag); if (l && l.length) return [...l]; } catch {}
-  return [];
-}
-function tx(parent, tag, fb = '') { const e = el1(parent, tag); return e && e.textContent != null ? e.textContent.trim() : fb; }
-function num(parent, ...tags) { for (const t of tags) { const e = el1(parent, t); if (e && e.textContent.trim() !== '') { const v = parseFloat(e.textContent.trim().replace(',', '.')); if (!isNaN(v)) return v; } } return 0; }
 function str(parent, ...tags) { for (const t of tags) { const v = tx(parent, t, ''); if (v) return v; } return ''; }
-function firstEl(parent, ...tags) { for (const t of tags) { const e = el1(parent, t); if (e) return e; } return null; }
 
-/* --- Reforma por item --- */
-function reformaItem(det, prod) {
-  // Grupo IBS/CBS: tenta UB, IBSCBS, gIBSCBS, imposto/UB...
-  const imp = el1(det, 'imposto') || det;
-  const ub = firstEl(det, 'UB') || firstEl(imp, 'UB') || firstEl(det, 'IBSCBS') || firstEl(imp, 'IBSCBS') || firstEl(det, 'gIBSCBS') || firstEl(imp, 'gIBSCBS');
-  const ubScope = ub || det;
-  const gTrib = firstEl(ubScope, 'gIBSCBS') || ubScope;
-  const gIBSUF = firstEl(gTrib, 'gIBSUF'), gIBSMun = firstEl(gTrib, 'gIBSMun'), gCBS = firstEl(gTrib, 'gCBS');
-  const cClassTrib = str(ubScope, 'cClassTrib') || str(det, 'cClassTrib');
-  const cst = str(ubScope, 'CST') || str(gTrib, 'CST');
-  const vBC = num(gTrib, 'vBC') || num(ubScope, 'vBCIBS') || num(ubScope, 'vBCBS') || num(det, 'vBCIBS');
-  const pIBSUF = num(gIBSUF || gTrib, 'pIBSUF', 'pIBS');
-  const pIBSMun = num(gIBSMun || gTrib, 'pIBSMun');
-  const pCBS = num(gCBS || gTrib, 'pCBS');
-  const vIBSUF = num(gIBSUF || gTrib, 'vIBSUF', 'vIBS');
-  const vIBSMun = num(gIBSMun || gTrib, 'vIBSMun');
-  const vCBS = num(gCBS || gTrib, 'vCBS');
-  // IS: grupo VB / IS / gIS
-  const isEl = firstEl(det, 'IS') || firstEl(imp, 'IS') || firstEl(det, 'gIS') || firstEl(imp, 'gIS') || firstEl(det, 'VB') || firstEl(imp, 'VB');
-  const cstIS = isEl ? str(isEl, 'CSTIS', 'CST') : '';
-  const vBCIS = isEl ? num(isEl, 'vBCIS', 'vBC') : 0;
-  const pIS = isEl ? num(isEl, 'pIS', 'pISCOFINS') : 0;
-  const vIS = isEl ? num(isEl, 'vIS') : (num(det, 'vIS') || 0);
-  const has = !!(ub || isEl || cClassTrib || vIBSUF || vIBSMun || vCBS || vIS);
-  return { has, cClassTrib, cst, vBC, pIBSUF, pIBSMun, pCBS, vIBSUF, vIBSMun, vCBS, vIBSTot: vIBSUF + vIBSMun, cstIS, vBCIS, pIS, vIS };
+/* --- Reforma por item ---
+   `imp` é o <imposto> do item. O grupo de IBS/CBS é filho direto dele, na variante
+   <IBSCBS> ou embrulhado em <UB>; o <IS> também. Nada é buscado "em qualquer lugar
+   dentro do item": é essa escopo estrita que impede o CST do ICMS de virar CST de IBS/CBS. */
+function reformaItem(imp) {
+  const ibsCBS = grupoDe(imp, ['IBSCBS', 'UB', 'gIBSCBS']);
+  const gTrib = (ibsCBS ? filhoDe(ibsCBS, 'gIBSCBS') : null) || ibsCBS;
+  const gIBSUF = filhoDe(gTrib, 'gIBSUF'), gIBSMun = filhoDe(gTrib, 'gIBSMun'), gCBS = filhoDe(gTrib, 'gCBS');
+  // cClassTrib e CST saem SÓ do grupo de IBS/CBS. Antes eles eram procurados a partir
+  // do item inteiro e acertavam o <CST> do ICMS quando o item não tinha IBS/CBS.
+  const cClassTrib = ibsCBS ? str(ibsCBS, 'cClassTrib') : '';
+  const cst = ibsCBS ? str(ibsCBS, 'CST') : '';
+  const vBC = gTrib ? num(gTrib, 'vBC') : 0;
+  const pIBSUF = gIBSUF ? num(gIBSUF, 'pIBSUF', 'pIBS') : 0;
+  const pIBSMun = gIBSMun ? num(gIBSMun, 'pIBSMun') : 0;
+  const pCBS = gCBS ? num(gCBS, 'pCBS') : 0;
+  const vIBSUF = gIBSUF ? num(gIBSUF, 'vIBSUF') : 0;
+  const vIBSMun = gIBSMun ? num(gIBSMun, 'vIBSMun') : 0;
+  const vCBS = gCBS ? num(gCBS, 'vCBS') : 0;
+  const isEl = grupoDe(imp, ['IS', 'gIS']);
+  const cstIS = isEl ? str(isEl, 'CSTIS') : '';
+  const vBCIS = isEl ? num(isEl, 'vBCIS') : 0;
+  const pIS = isEl ? num(isEl, 'pIS') : 0;
+  const vIS = isEl ? num(isEl, 'vIS') : 0;
+  const temIbsCbs = !!ibsCBS;
+  const temIS = !!isEl;
+  return {
+    temIbsCbs, temIS, cClassTrib, cst, vBC, pIBSUF, pIBSMun, pCBS,
+    vIBSUF, vIBSMun, vCBS, vIBSTot: vIBSUF + vIBSMun, cstIS, vBCIS, pIS, vIS,
+    has: temIbsCbs || temIS
+  };
+}
+
+/* --- Reconciliação e chave de acesso --- */
+
+/* Total declarado no XML para um tributo, ou null se o grupo não traz o campo.
+   Devolve null em vez de 0 justamente para que "o XML declara zero" não seja
+   confundido com "o XML não traz o campo". */
+function totalDoXml(w03, tags, partes) {
+  if (!w03) return null;
+  const direto = numOuNull(w03, ...tags);
+  if (direto !== null) return direto;
+  const somados = partes.map(t => numOuNull(w03, t));
+  if (somados.every(v => v === null)) return null;
+  return somados.reduce((s, v) => s + (v ?? 0), 0);
+}
+
+/* Dígito verificador da chave: módulo 11 sobre os 43 primeiros dígitos, com os
+   multiplicadores 2, 3, 4 … 9 aplicados da direita para a esquerda. O DV é o 44º
+   dígito. (Manual de Orientação do Contribuinte, MOC NF-e.) */
+function digitoVerificador(base43) {
+  let soma = 0, peso = 2;
+  for (let i = base43.length - 1; i >= 0; i--) {
+    soma += Number(base43[i]) * peso;
+    peso = peso === 9 ? 2 : peso + 1;
+  }
+  const d = 11 - (soma % 11);
+  return d >= 10 ? 0 : d;
+}
+
+/* A chave não é só um identificador: ela carrega UF, AAMM, CNPJ, modelo, série,
+   número, forma de emissão e o próprio DV. Conferir esses campos contra o XML é o
+   que pega arquivo trocado, renomeado ou adulterado — e é o que o gerador não fazia.
+   Devolve a lista de problemas encontrados; lista vazia significa chave coerente. */
+function validarChave(chave, ref) {
+  const p = [];
+  const c = String(chave || '');
+  if (!/^\d{44}$/.test(c)) {
+    if (c) p.push(`Chave de acesso fora do padrão: esperado 44 dígitos, veio "${c}" (${c.length} caracteres).`);
+    return p;
+  }
+  const dv = Number(c[43]), calculado = digitoVerificador(c.slice(0, 43));
+  if (dv !== calculado) {
+    p.push(`Chave de acesso com dígito verificador inválido: o 44º dígito é ${dv}, mas o módulo 11 dos 43 primeiros dá ${calculado}.`);
+  }
+  const compara = (rotulo, naChave, noXml, digitos) => {
+    if (!naChave || !noXml) return;
+    if (naChave !== noXml) {
+      p.push(`Chave de acesso com ${rotulo} divergente do XML: a chave diz ${naChave}, o XML diz ${noXml}.`);
+    }
+  };
+  compara('UF do emitente', c.slice(0, 2), String(ref.cUF || '').padStart(2, '0'), 2);
+  compara('mês de emissão (AAMM)', c.slice(2, 6), String(ref.aamm || ''), 4);
+  if (ref.doc && ref.doc.length === 14) compara('CNPJ do emitente', c.slice(6, 20), ref.doc, 14);
+  compara('modelo', c.slice(20, 22), String(ref.mod || ''), 2);
+  compara('série', c.slice(22, 25), String(ref.serie || ''), 3);
+  compara('número da nota', c.slice(25, 34), String(ref.nNF || ''), 9);
+  compara('forma de emissão', c.slice(34, 35), String(ref.tpEmis || ''), 1);
+  return p;
 }
 
 /* --- Parser NF-e --- */
 function parseNFe(xml, name) {
-  const inf = el1(xml, 'infNFe'), scope = inf || xml;
-  const ide = el1(scope, 'ide') || el1(xml, 'ide');
-  const emit = el1(scope, 'emit') || el1(xml, 'emit');
-  const dest = el1(scope, 'dest') || el1(xml, 'dest');
-  const eEmit = firstEl(emit, 'enderEmit', 'enderEmi', 'ender');
-  const eDest = firstEl(dest, 'enderDest', 'enderEnt', 'ender');
-  const total = el1(xml, 'ICMSTot'), issTot = el1(xml, 'ISSQNtot');
-  const transp = el1(scope, 'transp') || el1(xml, 'transp');
-  const infAdic = el1(scope, 'infAdic') || el1(xml, 'infAdic');
-  const fat = el1(scope, 'fat') || el1(xml, 'fat');
-  const dups = allBy(fat || xml, 'dup').filter(d => fat ? true : false).map(d => ({ nDup: tx(d, 'nDup'), dVenc: fmtData(tx(d, 'dVenc')), vDup: num(d, 'vDup') }));
-  const dets = allBy(scope, 'det').length ? allBy(scope, 'det') : allBy(xml, 'det');
-  const itens = dets.map(det => {
-    const prod = el1(det, 'prod') || det;
-    const icmsEl = el1(det, 'ICMS');
-    let cstIcms = '';
-    if (icmsEl && icmsEl.children) for (const c of icmsEl.children) { const s = el1(c, 'CST') || el1(c, 'CSOSN'); if (s && s.textContent.trim()) { cstIcms = s.textContent.trim(); break; } }
-    const ref = reformaItem(det, prod);
+  const scope = noDoc(xml, 'infNFe') || xml;
+  const ide = filhoDe(scope, 'ide');
+  const emit = filhoDe(scope, 'emit');
+  const dest = filhoDe(scope, 'dest');
+  const eEmit = grupoDe(emit, ['enderEmit', 'enderEmi', 'ender']);
+  const eDest = grupoDe(dest, ['enderDest', 'enderEnt', 'ender']);
+  const grupoTotal = filhoDe(scope, 'total');
+  const total = filhoDe(grupoTotal, 'ICMSTot'), issTot = filhoDe(grupoTotal, 'ISSQNtot');
+  const transp = filhoDe(scope, 'transp');
+  const infAdic = filhoDe(scope, 'infAdic');
+  const fat = filhoDe(scope, 'fat');
+  const dups = filhosDe(fat).filter(d => d.nodeName === 'dup').map(d => ({ nDup: tx(d, 'nDup'), dVenc: fmtData(tx(d, 'dVenc')), vDup: num(d, 'vDup') }));
+  const dets = filhosDe(scope).filter(d => d.nodeName === 'det');
+  const itens = dets.map((det, i) => {
+    const prod = filhoDe(det, 'prod') || det;
+    const imp = filhoDe(det, 'imposto');
+    // O ICMS do item mora em <ICMS><ICMS00|ICMS10|…><vBC/><pICMS/><vICMS/>. Ler a base
+    // direto de <imposto> pegava o <vBC> do grupo de IBS/CBS quando ele vinha antes.
+    const icmsEl = filhoDe(imp, 'ICMS');
+    const grupoICMS = primeiroFilhoDe(icmsEl);
+    const ipiEl = filhoDe(imp, 'IPI');
+    const ref = reformaItem(imp || det);
     return {
+      nItem: (det.getAttribute && det.getAttribute('nItem')) || String(i + 1),
       cProd: tx(prod, 'cProd'), xProd: tx(prod, 'xProd'), infAdProd: tx(det, 'infAdProd'),
       NCM: tx(prod, 'NCM'), CFOP: tx(prod, 'CFOP'), uCom: tx(prod, 'uCom'), qCom: tx(prod, 'qCom'),
       vUnCom: num(prod, 'vUnCom'), vProd: num(prod, 'vProd'), vDesc: num(prod, 'vDesc'),
-      CST: cstIcms, BC: num(det, 'vBC') || num(icmsEl, 'vBC'),
-      vICMS: num(det, 'vICMS') || num(icmsEl, 'vICMS'), aliqICMS: str(icmsEl, 'pICMS'),
-      vIPI: num(det, 'vIPI') || num(el1(det, 'IPI'), 'vIPI'), aliqIPI: str(el1(det, 'IPI'), 'pIPI'),
+      CST: grupoICMS ? (str(grupoICMS, 'CST') || str(grupoICMS, 'CSOSN')) : '',
+      BC: grupoICMS ? num(grupoICMS, 'vBC') : 0,
+      vICMS: grupoICMS ? num(grupoICMS, 'vICMS') : 0, aliqICMS: grupoICMS ? str(grupoICMS, 'pICMS') : '',
+      vIPI: num(ipiEl, 'vIPI'), aliqIPI: str(ipiEl, 'pIPI'),
       ...ref
     };
   });
-  // Totais Reforma W03 (vários nomes possíveis)
-  const w03 = firstEl(xml, 'W03') || firstEl(xml, 'IBSCBSTot') || firstEl(xml, 'gIBSCBSTot') || firstEl(xml, 'ISTot') || firstEl(xml, 'totIBS');
-  const tIBS = w03 ? (num(w03, 'vIBS', 'vIBSTot', 'vTotIBS') || num(w03, 'vIBSUF') + num(w03, 'vIBSMun')) : 0;
-  const tCBS = w03 ? num(w03, 'vCBS', 'vCBSTot', 'vTotCBS') : 0;
-  const tIS = w03 ? num(w03, 'vIS', 'vISTot', 'vTotIS') : (num(xml, 'vISTot') || 0);
-  const sumIBS = itens.reduce((a, i) => a + (i.vIBSTot || 0), 0);
-  const sumCBS = itens.reduce((a, i) => a + (i.vCBS || 0), 0);
-  const sumIS = itens.reduce((a, i) => a + (i.vIS || 0), 0);
-  const chave = (onlyD(inf && inf.getAttribute('Id')) || '').slice(-44) || onlyD(tx(xml, 'chNFe'));
-  const protEl = el1(xml, 'protNFe');
-  const E = n => firstEl(emit, n) ? tx(emit, n) : '';
+  // --- Totais da Reforma: o XML declara, os itens conferem ---
+  // Antes o código fazia `declarado || somaDosItens`: um total declarado igual a zero
+  // era tratado como ausente e substituído pela soma, sem aviso. Num DANFE isso pode
+  // trocar R$ 0,00 por R$ 68,40. Agora o que o XML declara é o que sai impresso, e a
+  // divergência vira aviso explícito.
+  const w03 = grupoDe(grupoTotal, ['W03', 'IBSCBSTot', 'gIBSCBSTot', 'ISTot', 'totIBS']);
+  const declarado = {
+    vIBS: totalDoXml(w03, ['vIBS', 'vIBSTot', 'vTotIBS'], ['vIBSUF', 'vIBSMun']),
+    vCBS: totalDoXml(w03, ['vCBS', 'vCBSTot', 'vTotCBS'], []),
+    vIS: totalDoXml(w03, ['vIS', 'vISTot', 'vTotIS'], [])
+  };
+  const soma = {
+    vIBS: itens.reduce((a, i) => a + i.vIBSTot, 0),
+    vCBS: itens.reduce((a, i) => a + i.vCBS, 0),
+    vIS: itens.reduce((a, i) => a + i.vIS, 0)
+  };
+  const ROTULOS = { vIBS: 'IBS', vCBS: 'CBS', vIS: 'IS' };
+  const origem = {};
+  const alertas = [];
+  for (const campo of ['vIBS', 'vCBS', 'vIS']) {
+    const d = declarado[campo], s = soma[campo];
+    const temNoItem = itens.some(i => campo === 'vIBS' ? i.temIbsCbs : campo === 'vCBS' ? i.temIbsCbs : i.temIS);
+    if (d !== null) {
+      origem[campo] = 'xml';
+      if (temNoItem && Math.abs(d - s) > 0.01) {
+        alertas.push({
+          nivel: 'erro', campo,
+          texto: `Divergência no total de ${ROTULOS[campo]}: o XML declara ${num2(d)} e a soma dos itens dá ${num2(s)}. O DANFE mostra o valor do XML — confira o arquivo.`
+        });
+      }
+    } else if (temNoItem) {
+      origem[campo] = 'itens';
+      alertas.push({
+        nivel: 'aviso', campo,
+        texto: `Total de ${ROTULOS[campo]} (${num2(s)}) calculado pela soma dos itens: o XML não traz o grupo de totais da Reforma.`
+      });
+    } else {
+      origem[campo] = null;
+    }
+  }
+  const reforma = {
+    vIBS: declarado.vIBS ?? soma.vIBS,
+    vCBS: declarado.vCBS ?? soma.vCBS,
+    vIS: declarado.vIS ?? soma.vIS,
+    origem,
+    temNoXML: !!(w03 || itens.some(i => i.has))
+  };
+
+  // --- Chave de acesso ---
+  const chave = onlyD(scope.getAttribute && scope.getAttribute('Id')).slice(-44)
+    || onlyD(tx(filhoDe(noDoc(xml, 'protNFe'), 'infProt'), 'chNFe'));
+  const problemasChave = validarChave(chave, {
+    cUF: tx(ide, 'cUF'),
+    // AAMM na chave são 4 dígitos: os dois últimos do ano mais o mês (2026-11 → 2611).
+    aamm: (tx(ide, 'dhEmi') || tx(ide, 'dEmi')).replace(/\D/g, '').slice(2, 6),
+    doc: tx(emit, 'CNPJ') || tx(emit, 'CPF'),
+    mod: tx(ide, 'mod', '55'),
+    serie: String(tx(ide, 'serie', '1')).padStart(3, '0'),
+    nNF: String(tx(ide, 'nNF', '0')).padStart(9, '0'),
+    tpEmis: tx(ide, 'tpEmis', '1')
+  });
+  for (const p of problemasChave) alertas.push({ nivel: 'erro', campo: 'chave', texto: p });
+  const protEl = noDoc(xml, 'protNFe');
   const eo = eEmit ? { lgr: tx(eEmit, 'xLgr'), nro: tx(eEmit, 'nro'), bairro: tx(eEmit, 'xBairro'), mun: tx(eEmit, 'xMun'), uf: tx(eEmit, 'UF'), cep: tx(eEmit, 'CEP'), fone: tx(eEmit, 'fone') } : {};
   const doo = eDest ? { lgr: tx(eDest, 'xLgr'), nro: tx(eDest, 'nro'), bairro: tx(eDest, 'xBairro'), mun: tx(eDest, 'xMun'), uf: tx(eDest, 'UF'), cep: tx(eDest, 'CEP'), fone: tx(eDest, 'fone') } : {};
   return {
@@ -117,9 +249,14 @@ function parseNFe(xml, name) {
     dest: { nome: tx(dest, 'xNome') || '—', doc: tx(dest, 'CNPJ') || tx(dest, 'CPF'), IE: tx(dest, 'IE'), email: tx(dest, 'email'), ender: doo },
     fat: fat ? { vLiq: num(fat, 'vLiq') } : null, dups,
     tot: total ? { vBC: num(total, 'vBC'), vICMS: num(total, 'vICMS'), vBCST: num(total, 'vBCST'), vST: num(total, 'vST'), vProd: num(total, 'vProd'), vFrete: num(total, 'vFrete'), vSeg: num(total, 'vSeg'), vDesc: num(total, 'vDesc'), vII: num(total, 'vII'), vIPI: num(total, 'vIPI'), vPIS: num(total, 'vPIS'), vCOFINS: num(total, 'vCOFINS'), vOutro: num(total, 'vOutro'), vNF: num(total, 'vNF'), vTotTrib: num(total, 'vTotTrib') } : { vNF: 0 },
-    reforma: { vIBS: tIBS || sumIBS, vCBS: tCBS || sumCBS, vIS: tIS || sumIS, temNoXML: !!(w03 || sumIBS || sumCBS || sumIS || itens.some(i => i.has)) },
-    transp: transp ? { modFrete: tx(transp, 'modFrete'), tNome: tx(el1(transp, 'transporta'), 'xNome'), tDoc: tx(el1(transp, 'transporta'), 'CNPJ') || tx(el1(transp, 'transporta'), 'CPF'), vols: allBy(transp, 'vol').map(v => ({ qVol: tx(v, 'qVol'), esp: tx(v, 'esp'), pesoB: tx(v, 'pesoB'), pesoL: tx(v, 'pesoL') })) } : null,
+    reforma, problemasChave,
+    alertas,
+    transp: transp ? (() => { const t = filhoDe(transp, 'transporta'); return { modFrete: tx(transp, 'modFrete'), tNome: tx(t, 'xNome'), tDoc: tx(t, 'CNPJ') || tx(t, 'CPF'), vols: filhosDe(transp).filter(v => v.nodeName === 'vol').map(v => ({ qVol: tx(v, 'qVol'), esp: tx(v, 'esp'), pesoB: tx(v, 'pesoB'), pesoL: tx(v, 'pesoL') })) }; })() : null,
     iss: issTot ? { vServ: num(issTot, 'vServ'), vISS: num(issTot, 'vISS') } : null,
+    // infCpl e infAdFisco são campos diferentes do leiaute: o primeiro vai para
+    // "Informações complementares", o segundo para "Reservado ao fisco". O código
+    // anterior juntava os dois no mesmo campo e ainda imprimia um texto fixo da
+    // aplicação no lugar do fisco.
     infCpl: tx(infAdic, 'infCpl'), infFisco: tx(infAdic, 'infAdFisco'),
     prot: protEl ? { nProt: tx(protEl, 'nProt'), dh: tx(protEl, 'dhRecbto') } : null,
     itens
@@ -130,7 +267,7 @@ function parseXML(text, name) {
   const clean = String(text || '').replace(/xmlns(:\w+)?="[^"]*"/g, '');
   const xml = new DOMParser().parseFromString(clean, 'text/xml');
   if (xml.getElementsByTagName('parsererror').length) throw new Error('XML inválido');
-  if (!el1(xml, 'infNFe')) throw new Error('Este gerador lê NF-e modelo 55 (infNFe).');
+  if (!noDoc(xml, 'infNFe')) throw new Error('Este gerador lê NF-e modelo 55 (infNFe).');
   return parseNFe(xml, name);
 }
 
@@ -166,12 +303,24 @@ function renderDANFE(d) {
     </tr><tr class="reforma"><td colspan="12">${ref}</td></tr>`;
   }).join('');
 
+  // Faixa de alerta: divergência e chave inválida precisam aparecer no DANFE impresso,
+  // não só na tela. Sem isso o contador leva para a papelada um número que o XML não
+  // sustenta.
+  const faixasAlerta = (d.alertas || []).filter(a => a.nivel === 'erro')
+    .map(a => `<div class="stripe erro">⚠ ${esc(a.texto)}</div>`).join('');
+  const avisos = (d.alertas || []).filter(a => a.nivel === 'aviso')
+    .map(a => `<div class="stripe aviso">⚠ ${esc(a.texto)}</div>`).join('');
+
   const r = d.reforma;
+  // O rótulo declara a origem do número: "do XML" ou "somado dos itens". Um total que
+  // o gerador calculou não pode se passar por valor que o XML traz.
+  const rotuloOrigem = campo => r.origem && r.origem[campo] === 'itens'
+    ? ' <span class="origem">(soma dos itens)</span>' : '';
   const blocoReforma = r.temNoXML
     ? `<div class="d-tot-reforma">
-        <div><span class="d-lab">Total IBS (UF + Mun)</span><div class="v">${fmtBRL(r.vIBS)}</div></div>
-        <div><span class="d-lab">Total CBS</span><div class="v">${fmtBRL(r.vCBS)}</div></div>
-        <div><span class="d-lab">Total Imposto Seletivo (IS)</span><div class="v">${fmtBRL(r.vIS)}</div></div>
+        <div><span class="d-lab">Total IBS (UF + Mun)${rotuloOrigem('vIBS')}</span><div class="v">${fmtBRL(r.vIBS)}</div></div>
+        <div><span class="d-lab">Total CBS${rotuloOrigem('vCBS')}</span><div class="v">${fmtBRL(r.vCBS)}</div></div>
+        <div><span class="d-lab">Total Imposto Seletivo (IS)${rotuloOrigem('vIS')}</span><div class="v">${fmtBRL(r.vIS)}</div></div>
       </div>`
     : `<div class="d-tot-reforma"><div colspan="3"><span class="d-lab">IBS / CBS / IS</span><div class="d-val norm">Sem valores da Reforma no XML — correto para documento anterior a 01/12/2026 ou emitente em adaptação.</div></div></div>`;
 
@@ -182,8 +331,8 @@ function renderDANFE(d) {
       <div class="d-cell" style="width:150px;text-align:center"><span class="d-lab">Danfe</span><div class="d-val" style="font-size:15px">DANFE</div><div style="font-size:8px">Doc. Auxiliar da NF-e</div><div style="font-size:10px;margin-top:2px">${d.tpNF === '0' ? '0-ENTRADA' : '1-SAÍDA'}</div><div style="font-size:10px;font-weight:bold">Série ${esc(d.serie)}</div><div style="font-size:11px;font-weight:bold">Nº ${esc(fmtNF(d.nNF))}</div></div>
       <div class="d-cell" style="flex:1.3;text-align:center"><span class="d-lab">Controle do fisco — chave de acesso</span>${barcodeSVG(d.chave)}<div style="font-size:7.5px">Consulta em nfe.fazenda.gov.br/portal</div></div>
     </div>
-    ${stripes}
-    <div class="d-row first" style="margin-top:${stripes ? '0' : '4px'}">
+    ${faixasAlerta}${avisos}${stripes}
+    <div class="d-row first" style="margin-top:${stripes || faixasAlerta || avisos ? '0' : '4px'}">
       <div class="d-cell" style="flex:1.4"><span class="d-lab">Natureza da operação</span><div class="d-val">${esc(d.natOp || '—')}</div></div>
       <div class="d-cell" style="flex:1"><span class="d-lab">Protocolo de autorização de uso</span><div class="d-val">${d.prot ? esc(d.prot.nProt) + ' · ' + esc(fmtData(d.prot.dh)) + ' ' + esc(fmtHora(d.prot.dh)) : 'SEM PROTOCOLO'}</div></div>
     </div>
@@ -241,9 +390,29 @@ function renderDANFE(d) {
     </table>
     ${d.iss && (d.iss.vServ || d.iss.vISS) ? `<div class="d-sec">Cálculo do ISSQN</div><div class="d-row first"><div class="d-cell"><div class="d-val">V.Serv ${num2(d.iss.vServ)} · V.ISS ${num2(d.iss.vISS)}</div></div></div>` : ''}
     <div class="d-sec">Dados adicionais</div>
-    <div class="d-row first"><div class="d-cell" style="flex:1"><span class="d-lab">Informações complementares</span><div class="d-val norm">${esc([d.infCpl, d.infFisco].filter(Boolean).join(' | ') || '—')}</div></div><div class="d-cell" style="width:180px"><span class="d-lab">Reservado ao fisco</span><div class="d-val norm">NT 2026.010 v1.00 · produção 01/12/2026</div></div></div>
+    <div class="d-row first"><div class="d-cell" style="flex:1"><span class="d-lab">Informações complementares</span><div class="d-val norm">${esc(d.infCpl || '—')}</div></div><div class="d-cell" style="width:180px"><span class="d-lab">Reservado ao fisco</span><div class="d-val norm">${esc(d.infFisco || '—')}</div></div></div>
     <div class="d-foot"><span>Gerado localmente a partir do XML · ${esc(d.fileName)} · Impresso em ${new Date().toLocaleString('pt-BR')}</span><span>DANFE — sem valor fiscal isolado · validade no XML autorizado</span></div>
   </div>`;
+}
+
+/* --- XML de exemplo distribuído com o site --- */
+const SAMPLE = `<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe">
+<NFe><infNFe Id="NFe35261112345678000195550010000004561000004568">
+<ide><cUF>35</cUF><natOp>VENDA DE MERCADORIA</natOp><mod>55</mod><serie>1</serie><nNF>456</nNF><dhEmi>2026-11-20T10:00:00-03:00</dhEmi><tpNF>1</tpNF><tpAmb>2</tpAmb><tpEmis>1</tpEmis><finNFe>1</finNFe></ide>
+<emit><CNPJ>12345678000195</CNPJ><xNome>EMPRESA EXEMPLO LTDA</xNome><IE>123456789</IE><CRT>3</CRT><enderEmit><xLgr>RUA DAS PALMEIRAS</xLgr><nro>100</nro><xBairro>CENTRO</xBairro><xMun>SAO PAULO</xMun><UF>SP</UF><CEP>01001000</CEP><fone>1133334444</fone></enderEmit></emit>
+<dest><CNPJ>98765432000110</CNPJ><xNome>CLIENTE EXEMPLO SA</xNome><IE>987654321</IE><enderDest><xLgr>AV BRASIL</xLgr><nro>200</nro><xBairro>CENTRO</xBairro><xMun>RIO DE JANEIRO</xMun><UF>RJ</UF><CEP>20010000</CEP></enderDest></dest>
+<det nItem="1"><prod><cProd>001</cProd><xProd>NOTEBOOK CORPORATIVO 14pol</xProd><NCM>84713000</NCM><CFOP>5102</CFOP><uCom>UN</uCom><qCom>2.0000</qCom><vUnCom>3500.0000</vUnCom><vProd>7000.00</vProd></prod><imposto><ICMS><ICMS00><CST>00</CST><vBC>7000.00</vBC><pICMS>18.00</pICMS><vICMS>1260.00</vICMS></ICMS00></ICMS><UB><CST>000</CST><cClassTrib>000001</cClassTrib><gIBSCBS><vBC>7000.00</vBC><gIBSUF><pIBSUF>0.10</pIBSUF><vIBSUF>7.00</vIBSUF></gIBSUF><gIBSMun><pIBSMun>0.00</pIBSMun><vIBSMun>0.00</vIBSMun></gIBSMun><gCBS><pCBS>0.90</pCBS><vCBS>63.00</vCBS></gCBS></gIBSCBS></UB><IS><CSTIS>00</CSTIS><vBCIS>7000.00</vBCIS><pIS>0.00</pIS><vIS>0.00</vIS></IS></imposto></det>
+<det nItem="2"><prod><cProd>002</cProd><xProd>REFRIGERANTE LATA 350ML CX C/12 (IS)</xProd><NCM>22021000</NCM><CFOP>5102</CFOP><uCom>CX</uCom><qCom>10.0000</qCom><vUnCom>60.0000</vUnCom><vProd>600.00</vProd></prod><imposto><ICMS><ICMS00><CST>00</CST><vBC>600.00</vBC><pICMS>18.00</pICMS><vICMS>108.00</vICMS></ICMS00></ICMS><UB><CST>000</CST><cClassTrib>000002</cClassTrib><gIBSCBS><vBC>600.00</vBC><gIBSUF><pIBSUF>0.10</pIBSUF><vIBSUF>0.60</vIBSUF></gIBSUF><gCBS><pCBS>0.90</pCBS><vCBS>5.40</vCBS></gCBS></gIBSCBS></UB><IS><CSTIS>10</CSTIS><vBCIS>600.00</vBCIS><pIS>5.00</pIS><vIS>30.00</vIS></IS></imposto></det>
+<total><ICMSTot><vBC>7600.00</vBC><vICMS>1368.00</vICMS><vProd>7600.00</vProd><vFrete>0.00</vFrete><vNF>7600.00</vNF><vTotTrib>1500.00</vTotTrib></ICMSTot><W03><vIBS>7.60</vIBS><vCBS>68.40</vCBS><vIS>30.00</vIS></W03></total>
+<transp><modFrete>9</modFrete></transp>
+<infAdic><infCpl>AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL. NT 2026.010 v1.00 - demonstracao IBS/CBS/IS.</infCpl></infAdic>
+</infNFe></NFe>
+<protNFe><infProt><nProt>135260000000001</nProt><dhRecbto>2026-11-20T10:01:00-03:00</dhRecbto><chNFe>35261112345678000195550010000004561000004568</chNFe></infProt></protNFe>
+</nfeProc>`;
+function downloadSample() {
+  const blob = new Blob([SAMPLE], { type: 'text/xml' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'exemplo-nfe-reforma-nt2026-010.xml'; a.click();
 }
 
 /* --- Lote / UI --- */
@@ -280,6 +449,8 @@ async function handleFiles(files) {
   if (docs.length) $('#danfeArea').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+/* --- Interface: só existe no navegador --- */
+function iniciar() {
 dropzone.addEventListener('click', e => { if (e.target.closest('button')) return; fileInput.click(); });
 $('#btnPick').onclick = e => { e.stopPropagation(); fileInput.click(); };
 $('#btnPickTop').onclick = () => fileInput.click();
@@ -318,23 +489,6 @@ $('#btnCsv').onclick = () => {
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'conferencia-danfe-reforma.csv'; a.click();
 };
 
-const SAMPLE = `<?xml version="1.0" encoding="UTF-8"?>
-<nfeProc versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe">
-<NFe><infNFe Id="NFe35260912345678000195550010000004561000004561">
-<ide><cUF>35</cUF><natOp>VENDA DE MERCADORIA</natOp><mod>55</mod><serie>1</serie><nNF>456</nNF><dhEmi>2026-11-20T10:00:00-03:00</dhEmi><tpNF>1</tpNF><tpAmb>2</tpAmb><tpEmis>1</tpEmis><finNFe>1</finNFe></ide>
-<emit><CNPJ>12345678000195</CNPJ><xNome>EMPRESA EXEMPLO LTDA</xNome><IE>123456789</IE><CRT>3</CRT><enderEmit><xLgr>RUA DAS PALMEIRAS</xLgr><nro>100</nro><xBairro>CENTRO</xBairro><xMun>SAO PAULO</xMun><UF>SP</UF><CEP>01001000</CEP><fone>1133334444</fone></enderEmit></emit>
-<dest><CNPJ>98765432000110</CNPJ><xNome>CLIENTE EXEMPLO SA</xNome><IE>987654321</IE><enderDest><xLgr>AV BRASIL</xLgr><nro>200</nro><xBairro>CENTRO</xBairro><xMun>RIO DE JANEIRO</xMun><UF>RJ</UF><CEP>20010000</CEP></enderDest></dest>
-<det nItem="1"><prod><cProd>001</cProd><xProd>NOTEBOOK CORPORATIVO 14pol</xProd><NCM>84713000</NCM><CFOP>5102</CFOP><uCom>UN</uCom><qCom>2.0000</qCom><vUnCom>3500.0000</vUnCom><vProd>7000.00</vProd></prod><imposto><ICMS><ICMS00><CST>00</CST><vBC>7000.00</vBC><pICMS>18.00</pICMS><vICMS>1260.00</vICMS></ICMS00></ICMS><UB><CST>000</CST><cClassTrib>000001</cClassTrib><gIBSCBS><vBC>7000.00</vBC><gIBSUF><pIBSUF>0.10</pIBSUF><vIBSUF>7.00</vIBSUF></gIBSUF><gIBSMun><pIBSMun>0.00</pIBSMun><vIBSMun>0.00</vIBSMun></gIBSMun><gCBS><pCBS>0.90</pCBS><vCBS>63.00</vCBS></gCBS></gIBSCBS></UB><IS><CSTIS>00</CSTIS><vBCIS>7000.00</vBCIS><pIS>0.00</pIS><vIS>0.00</vIS></IS></imposto></det>
-<det nItem="2"><prod><cProd>002</cProd><xProd>REFRIGERANTE LATA 350ML CX C/12 (IS)</xProd><NCM>22021000</NCM><CFOP>5102</CFOP><uCom>CX</uCom><qCom>10.0000</qCom><vUnCom>60.0000</vUnCom><vProd>600.00</vProd></prod><imposto><ICMS><ICMS00><CST>00</CST><vBC>600.00</vBC><pICMS>18.00</pICMS><vICMS>108.00</vICMS></ICMS00></ICMS><UB><CST>000</CST><cClassTrib>000002</cClassTrib><gIBSCBS><vBC>600.00</vBC><gIBSUF><pIBSUF>0.10</pIBSUF><vIBSUF>0.60</vIBSUF></gIBSUF><gCBS><pCBS>0.90</pCBS><vCBS>5.40</vCBS></gCBS></gIBSCBS></UB><IS><CSTIS>10</CSTIS><vBCIS>600.00</vBCIS><pIS>5.00</pIS><vIS>30.00</vIS></IS></imposto></det>
-<total><ICMSTot><vBC>7600.00</vBC><vICMS>1368.00</vICMS><vProd>7600.00</vProd><vFrete>0.00</vFrete><vNF>7600.00</vNF><vTotTrib>1500.00</vTotTrib></ICMSTot><W03><vIBS>7.60</vIBS><vCBS>68.40</vCBS><vIS>30.00</vIS></W03></total>
-<transp><modFrete>9</modFrete></transp>
-<infAdic><infCpl>AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL. NT 2026.010 v1.00 - demonstracao IBS/CBS/IS.</infCpl></infAdic>
-</infNFe></NFe>
-<protNFe><infProt><nProt>135260000000001</nProt><dhRecbto>2026-11-20T10:01:00-03:00</dhRecbto><chNFe>35260912345678000195550010000004561000004561</chNFe></infProt></protNFe>
-</nfeProc>`;
-function downloadSample() {
-  const blob = new Blob([SAMPLE], { type: 'text/xml' });
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'exemplo-nfe-reforma-nt2026-010.xml'; a.click();
 }
-$('#btnSample').onclick = e => { e.stopPropagation(); downloadSample(); };
-$('#btnSampleTop').onclick = downloadSample;
+
+if (typeof document !== 'undefined') iniciar();
