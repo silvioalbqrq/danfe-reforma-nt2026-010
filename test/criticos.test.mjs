@@ -25,6 +25,123 @@ const { parseXML, renderDANFE } = app;
 const alerta = (doc, texto) =>
   doc.alertas.some((a) => a.texto.toLowerCase().includes(texto.toLowerCase()));
 
+const IMPOSTO_GRED = `<imposto>
+  <ICMS><ICMS00><CST>00</CST><vBC>1000.00</vBC><pICMS>18.00</pICMS><vICMS>180.00</vICMS></ICMS00></ICMS>
+  <IBSCBS><CST>200</CST><cClassTrib>000002</cClassTrib>
+    <gIBSCBS><vBC>1000.00</vBC>
+      <gIBSUF><pIBSUF>0.1000</pIBSUF><gRed><pRedAliq>40.00</pRedAliq><pAliqEfet>0.0600</pAliqEfet></gRed><vIBSUF>0.60</vIBSUF></gIBSUF>
+      <gIBSMun><pIBSMun>0.0500</pIBSMun><gRed><pAliqEfet>0.0300</pAliqEfet></gRed><vIBSMun>0.30</vIBSMun></gIBSMun>
+      <gCBS><pCBS>0.9000</pCBS><gRed><pAliqEfet>0.5400</pAliqEfet></gRed><vCBS>5.40</vCBS></gCBS>
+    </gIBSCBS>
+  </IBSCBS>
+</imposto>`;
+
+test('NT §4.3: com redução (gRed/pAliqEfet) o DANFE mostra a alíquota efetiva', () => {
+  const doc = parseXML(nfe({ imposto: IMPOSTO_GRED }), 'gred.xml');
+  const it = doc.itens[0];
+
+  assert.equal(it.pIBSUF, 0.06);
+  assert.equal(it.pIBSMun, 0.03);
+  assert.equal(it.pCBS, 0.54);
+  assert.equal(it.efetiva, true);
+  const html = renderDANFE(doc);
+  assert.match(html, /0,06/);
+  assert.match(html, /efetiva/i);
+});
+
+test('NT §4.3: sem redução mostra a vigente e sem marcador de efetiva', () => {
+  const imposto = `<imposto>
+    <ICMS><ICMS00><CST>00</CST><vBC>20.00</vBC><pICMS>18.00</pICMS><vICMS>3.60</vICMS></ICMS00></ICMS>
+    <IBSCBS><CST>000</CST><cClassTrib>000001</cClassTrib>
+      <gIBSCBS><vBC>20.00</vBC>
+        <gIBSUF><pIBSUF>0.1000</pIBSUF><vIBSUF>0.02</vIBSUF></gIBSUF>
+        <gCBS><pCBS>0.9000</pCBS><vCBS>0.18</vCBS></gCBS>
+      </gIBSCBS>
+    </IBSCBS>
+  </imposto>`;
+  const doc = parseXML(nfe({ imposto }), 'vig.xml');
+
+  assert.equal(doc.itens[0].pIBSUF, 0.1);
+  assert.equal(doc.itens[0].efetiva, false);
+  assert.doesNotMatch(renderDANFE(doc), /efetiva/i);
+});
+
+test('NT §4.3: compra governamental sem pAliqEfet não inventa efetiva', () => {
+  const imposto = `<imposto>
+    <ICMS><ICMS00><CST>00</CST><vBC>20.00</vBC><pICMS>18.00</pICMS><vICMS>3.60</vICMS></ICMS00></ICMS>
+    <IBSCBS><CST>000</CST><cClassTrib>000001</cClassTrib>
+      <gIBSCBS><vBC>20.00</vBC>
+        <gIBSUF><pIBSUF>0.1000</pIBSUF><vIBSUF>0.02</vIBSUF></gIBSUF>
+        <gCBS><pCBS>0.9000</pCBS><vCBS>0.18</vCBS></gCBS>
+        <gTribCompraGov><pAliqIBSUF>0.1000</pAliqIBSUF></gTribCompraGov>
+      </gIBSCBS>
+    </IBSCBS>
+  </imposto>`;
+  const doc = parseXML(nfe({ imposto }), 'gov.xml');
+
+  assert.equal(doc.itens[0].pIBSUF, 0.1);
+  assert.equal(doc.itens[0].efetiva, false);
+});
+
+test('NT §4.1: totais monofásicos do XML aparecem no bloco', () => {
+  const total = `<ICMSTot><vProd>20.00</vProd><vNF>20.00</vNF></ICMSTot>
+    <W03><vIBS>2.00</vIBS><vCBS>18.00</vCBS><vIBSMono>2.00</vIBSMono><vCBSMono>3.00</vCBSMono></W03>`;
+  const doc = parseXML(nfe({ total }), 'mono.xml');
+
+  assert.equal(doc.reforma.vIBSMono, 2);
+  assert.equal(doc.reforma.vCBSMono, 3);
+  const html = renderDANFE(doc);
+  assert.match(html, /MONOF/i);
+});
+
+test('NT §4.1: sem monofásico no XML, a linha some em vez de zerar', () => {
+  const html = renderDANFE(parseXML(nfe({}), 'semmono.xml'));
+  assert.doesNotMatch(html, /MONOF/i);
+});
+
+test('NT §4.1: IBS UF e IBS Mun saem separados quando o XML discrimina', () => {
+  const imposto = `<imposto>
+    <ICMS><ICMS00><CST>00</CST><vBC>20.00</vBC></ICMS00></ICMS>
+    <IBSCBS><CST>000</CST><cClassTrib>000001</cClassTrib>
+      <gIBSCBS><vBC>20.00</vBC>
+        <gIBSUF><pIBSUF>0.10</pIBSUF><vIBSUF>2.00</vIBSUF></gIBSUF>
+        <gIBSMun><pIBSMun>0.05</pIBSMun><vIBSMun>1.00</vIBSMun></gIBSMun>
+        <gCBS><pCBS>0.90</pCBS><vCBS>18.00</vCBS></gCBS>
+      </gIBSCBS>
+    </IBSCBS>
+  </imposto>`;
+  const total = `<ICMSTot><vProd>20.00</vProd><vNF>20.00</vNF></ICMSTot>
+    <W03><vIBSUF>2.00</vIBSUF><vIBSMun>1.00</vIBSMun><vCBS>18.00</vCBS></W03>`;
+  const doc = parseXML(nfe({ imposto, total }), 'ufmun.xml');
+
+  assert.equal(doc.reforma.vIBSUF, 2);
+  assert.equal(doc.reforma.vIBSMun, 1);
+  assert.match(renderDANFE(doc), /IBS UF/);
+});
+
+test('NT §4.1: sem UF/Mun no XML, a soma dos itens preenche com origem declarada', () => {
+  const imposto = `<imposto>
+    <ICMS><ICMS00><CST>00</CST><vBC>20.00</vBC></ICMS00></ICMS>
+    <IBSCBS><CST>000</CST><cClassTrib>000001</cClassTrib>
+      <gIBSCBS><vBC>20.00</vBC>
+        <gIBSUF><pIBSUF>0.10</pIBSUF><vIBSUF>0.02</vIBSUF></gIBSUF>
+        <gCBS><pCBS>0.90</pCBS><vCBS>0.18</vCBS></gCBS>
+      </gIBSCBS>
+    </IBSCBS>
+  </imposto>`;
+  const total = `<ICMSTot><vProd>20.00</vProd><vNF>20.00</vNF></ICMSTot>
+    <W03><vIBS>0.02</vIBS><vCBS>0.18</vCBS></W03>`;
+  const doc = parseXML(nfe({ imposto, total }), 'somauf.xml');
+
+  assert.equal(doc.reforma.vIBSUF, 0.02);
+  assert.equal(doc.reforma.origem.vIBSUF, 'itens');
+});
+
+test('NT: quadro de Dados Adicionais reserva espaço para o QR Code', () => {
+  const html = renderDANFE(parseXML(nfe({}), 'qr.xml'));
+  assert.match(html, /QR Code/);
+});
+
 test('Parser não carrega campos que o DANFE nunca imprime', () => {
   const doc = parseXML(nfe({}), 'enxuto.xml');
   assert.ok(!('email' in doc.dest), 'dest.email é dead data');

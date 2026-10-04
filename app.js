@@ -62,9 +62,15 @@ function reformaItem(imp) {
   const cClassTrib = ibsCBS ? str(ibsCBS, 'cClassTrib') : '';
   const cst = ibsCBS ? str(ibsCBS, 'CST') : '';
   const vBC = gTrib ? num(gTrib, 'vBC') : 0;
-  const pIBSUF = gIBSUF ? num(gIBSUF, 'pIBSUF', 'pIBS') : 0;
-  const pIBSMun = gIBSMun ? num(gIBSMun, 'pIBSMun') : 0;
-  const pCBS = gCBS ? num(gCBS, 'pCBS') : 0;
+  // NT §4.3: cada alíquota sai vigente ou efetiva (gRed/pAliqEfet); o item marca
+  // efetiva quando qualquer uma das três vier do gRed.
+  const aUF = gIBSUF ? aliqEscolhida(gIBSUF, 'pIBSUF', 'pIBS') : { valor: 0, efetiva: false };
+  const aMun = gIBSMun ? aliqEscolhida(gIBSMun, 'pIBSMun') : { valor: 0, efetiva: false };
+  const aCBS = gCBS ? aliqEscolhida(gCBS, 'pCBS') : { valor: 0, efetiva: false };
+  const pIBSUF = aUF.valor;
+  const pIBSMun = aMun.valor;
+  const pCBS = aCBS.valor;
+  const efetiva = aUF.efetiva || aMun.efetiva || aCBS.efetiva;
   const vIBSUF = gIBSUF ? num(gIBSUF, 'vIBSUF') : 0;
   const vIBSMun = gIBSMun ? num(gIBSMun, 'vIBSMun') : 0;
   const vCBS = gCBS ? num(gCBS, 'vCBS') : 0;
@@ -76,10 +82,19 @@ function reformaItem(imp) {
   const temIbsCbs = !!ibsCBS;
   const temIS = !!isEl;
   return {
-    temIbsCbs, temIS, cClassTrib, cst, vBC, pIBSUF, pIBSMun, pCBS,
+    temIbsCbs, temIS, cClassTrib, cst, vBC, pIBSUF, pIBSMun, pCBS, efetiva,
     vIBSUF, vIBSMun, vCBS, vIBSTot: vIBSUF + vIBSMun, cstIS, vBCIS, pIS, vIS,
     has: temIbsCbs || temIS
   };
+}
+
+/* NT §4.3: com redução (gRed/pAliqEfet) vale a efetiva; sem ela, a vigente.
+   Compra governamental sem pAliqEfet não inventa efetiva. */
+function aliqEscolhida(grupo, ...tagsVig) {
+  const red = filhoDe(grupo, 'gRed');
+  const ef = red ? str(red, 'pAliqEfet') : '';
+  if (ef !== '') { const v = parseFloat(ef.replace(',', '.')); if (!isNaN(v)) return { valor: v, efetiva: true }; }
+  return { valor: num(grupo, ...tagsVig), efetiva: false };
 }
 
 /* --- Reconciliação e chave de acesso --- */
@@ -182,22 +197,37 @@ function parseNFe(xml, name) {
   // trocar R$ 0,00 por R$ 68,40. Agora o que o XML declara é o que sai impresso, e a
   // divergência vira aviso explícito.
   const w03 = grupoDe(grupoTotal, ['W03', 'IBSCBSTot', 'gIBSCBSTot', 'ISTot', 'totIBS']);
+  // NT §4.1: parte dos totais vem aninhada (gIBS/gIBSUF, gMono...), então cada campo
+  // é procurado no W03 direto e no subgrupo correspondente.
+  const gIBS = filhoDe(w03, 'gIBS'), gMono = filhoDe(w03, 'gMono');
+  const campoTotal = (escopos, ...tags) => {
+    for (const s of escopos) { const v = totalDoXml(s, tags, []); if (v !== null) return v; }
+    return null;
+  };
   const declarado = {
-    vIBS: totalDoXml(w03, ['vIBS', 'vIBSTot', 'vTotIBS'], ['vIBSUF', 'vIBSMun']),
-    vCBS: totalDoXml(w03, ['vCBS', 'vCBSTot', 'vTotCBS'], []),
-    vIS: totalDoXml(w03, ['vIS', 'vISTot', 'vTotIS'], [])
+    vIBS: campoTotal([w03, gIBS], 'vIBS', 'vIBSTot', 'vTotIBS'),
+    vIBSUF: campoTotal([w03, filhoDe(gIBS, 'gIBSUF')], 'vIBSUF'),
+    vIBSMun: campoTotal([w03, filhoDe(gIBS, 'gIBSMun')], 'vIBSMun'),
+    vCBS: campoTotal([w03, gIBS, filhoDe(gIBS || w03, 'gCBS')], 'vCBS', 'vCBSTot', 'vTotCBS'),
+    vIS: campoTotal([w03, filhoDe(w03, 'gIS')], 'vIS', 'vISTot', 'vTotIS'),
+    vIBSMono: campoTotal([w03, gMono], 'vIBSMono'),
+    vCBSMono: campoTotal([w03, gMono], 'vCBSMono'),
+    vIBSMonoReten: campoTotal([w03, gMono], 'vIBSMonoReten'),
+    vCBSMonoReten: campoTotal([w03, gMono], 'vCBSMonoReten')
   };
   const soma = {
     vIBS: itens.reduce((a, i) => a + i.vIBSTot, 0),
+    vIBSUF: itens.reduce((a, i) => a + i.vIBSUF, 0),
+    vIBSMun: itens.reduce((a, i) => a + i.vIBSMun, 0),
     vCBS: itens.reduce((a, i) => a + i.vCBS, 0),
     vIS: itens.reduce((a, i) => a + i.vIS, 0)
   };
-  const ROTULOS = { vIBS: 'IBS', vCBS: 'CBS', vIS: 'IS' };
+  const ROTULOS = { vIBS: 'IBS', vIBSUF: 'IBS UF', vIBSMun: 'IBS Município', vCBS: 'CBS', vIS: 'IS' };
   const origem = {};
   const alertas = [];
-  for (const campo of ['vIBS', 'vCBS', 'vIS']) {
+  for (const campo of ['vIBS', 'vIBSUF', 'vIBSMun', 'vCBS', 'vIS']) {
     const d = declarado[campo], s = soma[campo];
-    const temNoItem = itens.some(i => campo === 'vIBS' ? i.temIbsCbs : campo === 'vCBS' ? i.temIbsCbs : i.temIS);
+    const temNoItem = itens.some(i => campo === 'vIS' ? i.temIS : i.temIbsCbs);
     if (d !== null) {
       origem[campo] = 'xml';
       if (temNoItem && Math.abs(d - s) > 0.01) {
@@ -218,8 +248,14 @@ function parseNFe(xml, name) {
   }
   const reforma = {
     vIBS: declarado.vIBS ?? soma.vIBS,
+    vIBSUF: declarado.vIBSUF ?? soma.vIBSUF,
+    vIBSMun: declarado.vIBSMun ?? soma.vIBSMun,
     vCBS: declarado.vCBS ?? soma.vCBS,
     vIS: declarado.vIS ?? soma.vIS,
+    vIBSMono: declarado.vIBSMono,
+    vCBSMono: declarado.vCBSMono,
+    vIBSMonoReten: declarado.vIBSMonoReten,
+    vCBSMonoReten: declarado.vCBSMonoReten,
     origem,
     temNoXML: !!(w03 || itens.some(i => i.has))
   };
@@ -309,7 +345,7 @@ function renderDANFE(d) {
     (!d.prot ? `<div class="stripe noprot">SEM PROTOCOLO DE AUTORIZAÇÃO NO XML — não transite com a mercadoria</div>` : '');
   const itensHTML = d.itens.map((it, i) => {
     const ref = it.has
-      ? `<span class="tag">IBS ${esc(it.cst || '—')}</span> cClassTrib <b>${esc(it.cClassTrib || '—')}</b> · BC ${num2(it.vBC)} · alíq UF ${num2(it.pIBSUF)}% / Mun ${num2(it.pIBSMun)}% / CBS ${num2(it.pCBS)}% · vIBS ${num2(it.vIBSTot)} (UF ${num2(it.vIBSUF)} + Mun ${num2(it.vIBSMun)}) · vCBS ${num2(it.vCBS)}` +
+      ? `<span class="tag">IBS ${esc(it.cst || '—')}</span> cClassTrib <b>${esc(it.cClassTrib || '—')}</b> · BC ${num2(it.vBC)} · alíq UF ${num2(it.pIBSUF)}% / Mun ${num2(it.pIBSMun)}% / CBS ${num2(it.pCBS)}%${it.efetiva ? ' · <span class="tag">alíquota efetiva</span>' : ''} · vIBS ${num2(it.vIBSTot)} (UF ${num2(it.vIBSUF)} + Mun ${num2(it.vIBSMun)}) · vCBS ${num2(it.vCBS)}` +
         (it.vIS || it.cstIS ? ` · <span class="tag is">IS ${esc(it.cstIS || '')}</span> BC ${num2(it.vBCIS)} alíq ${num2(it.pIS)}% vIS ${num2(it.vIS)}` : ` · IS —`)
       : `<span style="color:#5b6b7f">Sem grupos da Reforma neste item (XML anterior à NT 2026.010 ou operação sem IBS/CBS/IS).</span>`;
     return `<tr>
@@ -334,12 +370,23 @@ function renderDANFE(d) {
   // o gerador calculou não pode se passar por valor que o XML traz.
   const rotuloOrigem = campo => r.origem && r.origem[campo] === 'itens'
     ? ' <span class="origem">(soma dos itens)</span>' : '';
+  // NT §4.1, quadros monofásicos: a linha só existe quando o XML traz ao menos um.
+  const monoVals = [r.vIBSMono, r.vCBSMono, r.vIBSMonoReten, r.vCBSMonoReten];
+  const temMono = monoVals.some(v => v !== null && v !== undefined);
+  const fmtTot = v => (v === null || v === undefined) ? '—' : fmtBRL(v);
   const blocoReforma = r.temNoXML
     ? `<div class="d-tot-reforma">
-        <div><span class="d-lab">Total IBS (UF + Mun)${rotuloOrigem('vIBS')}</span><div class="v">${fmtBRL(r.vIBS)}</div></div>
+        <div><span class="d-lab">Total IBS UF${rotuloOrigem('vIBSUF')}</span><div class="v">${fmtBRL(r.vIBSUF)}</div></div>
+        <div><span class="d-lab">Total IBS Município${rotuloOrigem('vIBSMun')}</span><div class="v">${fmtBRL(r.vIBSMun)}</div></div>
         <div><span class="d-lab">Total CBS${rotuloOrigem('vCBS')}</span><div class="v">${fmtBRL(r.vCBS)}</div></div>
         <div><span class="d-lab">Total Imposto Seletivo (IS)${rotuloOrigem('vIS')}</span><div class="v">${fmtBRL(r.vIS)}</div></div>
-      </div>`
+      </div>` +
+      (temMono ? `<div class="d-tot-reforma">
+        <div><span class="d-lab">IBS Monofásico</span><div class="v">${fmtTot(r.vIBSMono)}</div></div>
+        <div><span class="d-lab">CBS Monofásica</span><div class="v">${fmtTot(r.vCBSMono)}</div></div>
+        <div><span class="d-lab">IBS Mono por retenção</span><div class="v">${fmtTot(r.vIBSMonoReten)}</div></div>
+        <div><span class="d-lab">CBS Mono por retenção</span><div class="v">${fmtTot(r.vCBSMonoReten)}</div></div>
+      </div>` : '')
     : `<div class="d-tot-reforma"><div colspan="3"><span class="d-lab">IBS / CBS / IS</span><div class="d-val norm">Sem valores da Reforma no XML — correto para documento anterior a 01/12/2026 ou emitente em adaptação.</div></div></div>`;
 
   return `<div class="danfe">
@@ -408,7 +455,7 @@ function renderDANFE(d) {
     </table>
     ${d.iss && (d.iss.vServ || d.iss.vISS) ? `<div class="d-sec">Cálculo do ISSQN</div><div class="d-row first"><div class="d-cell"><div class="d-val">V.Serv ${num2(d.iss.vServ)} · V.ISS ${num2(d.iss.vISS)}</div></div></div>` : ''}
     <div class="d-sec">Dados adicionais</div>
-    <div class="d-row first"><div class="d-cell" style="flex:1"><span class="d-lab">Informações complementares</span><div class="d-val norm">${esc(limpaInfCpl(d.infCpl) || '—')}</div></div><div class="d-cell" style="width:180px"><span class="d-lab">Reservado ao fisco</span><div class="d-val norm">${esc(d.infFisco || '—')}</div></div></div>
+    <div class="d-row first"><div class="d-cell" style="flex:1"><span class="d-lab">Informações complementares</span><div class="d-val norm">${esc(limpaInfCpl(d.infCpl) || '—')}</div></div><div class="d-cell" style="width:180px"><span class="d-lab">Reservado ao fisco</span><div class="d-val norm">${esc(d.infFisco || '—')}</div></div><div class="d-cell" style="width:110px;text-align:center"><span class="d-lab">QR Code</span><div class="d-val norm" style="font-size:7.5px">espaço reservado — regulamentação futura</div></div></div>
     <div class="d-foot"><span>Gerado localmente a partir do XML · ${esc(d.fileName)} · Impresso em ${new Date().toLocaleString('pt-BR')}</span><span>DANFE — sem valor fiscal isolado · validade no XML autorizado</span></div>
   </div>`;
 }
