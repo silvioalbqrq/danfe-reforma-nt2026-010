@@ -52,7 +52,7 @@ function str(parent, ...tags) { for (const t of tags) { const v = tx(parent, t, 
 /* --- Reforma por item ---
    `imp` é o <imposto> do item. O grupo de IBS/CBS é filho direto dele, na variante
    <IBSCBS> ou embrulhado em <UB>; o <IS> também. Nada é buscado "em qualquer lugar
-   dentro do item": é essa escopo estrita que impede o CST do ICMS de virar CST de IBS/CBS. */
+   dentro do item": é esse escopo estrito que impede o CST do ICMS de virar CST de IBS/CBS. */
 function reformaItem(imp) {
   const ibsCBS = grupoDe(imp, ['IBSCBS', 'UB', 'gIBSCBS']);
   const gTrib = (ibsCBS ? filhoDe(ibsCBS, 'gIBSCBS') : null) || ibsCBS;
@@ -168,7 +168,7 @@ function parseNFe(xml, name) {
       nItem: (det.getAttribute && det.getAttribute('nItem')) || String(i + 1),
       cProd: tx(prod, 'cProd'), xProd: tx(prod, 'xProd'), infAdProd: tx(det, 'infAdProd'),
       NCM: tx(prod, 'NCM'), CFOP: tx(prod, 'CFOP'), uCom: tx(prod, 'uCom'), qCom: tx(prod, 'qCom'),
-      vUnCom: num(prod, 'vUnCom'), vProd: num(prod, 'vProd'), vDesc: num(prod, 'vDesc'),
+      vUnCom: num(prod, 'vUnCom'), vProd: num(prod, 'vProd'),
       CST: grupoICMS ? (str(grupoICMS, 'CST') || str(grupoICMS, 'CSOSN')) : '',
       BC: grupoICMS ? num(grupoICMS, 'vBC') : 0,
       vICMS: grupoICMS ? num(grupoICMS, 'vICMS') : 0, aliqICMS: grupoICMS ? str(grupoICMS, 'pICMS') : '',
@@ -250,7 +250,7 @@ function parseNFe(xml, name) {
     natOp: tx(ide, 'natOp'), dhEmi: tx(ide, 'dhEmi') || tx(ide, 'dEmi'), dhSai: tx(ide, 'dhSaiEnt'),
     tpNF: tx(ide, 'tpNF', '1'), tpAmb: tx(ide, 'tpAmb', '1'), tpEmis: tx(ide, 'tpEmis', '1'),
     emit: { nome: tx(emit, 'xNome'), doc: tx(emit, 'CNPJ') || tx(emit, 'CPF'), IE: tx(emit, 'IE'), IEST: tx(emit, 'IEST'), IM: tx(emit, 'IM'), CRT: tx(emit, 'CRT'), ender: eo },
-    dest: { nome: tx(dest, 'xNome') || '—', doc: tx(dest, 'CNPJ') || tx(dest, 'CPF'), IE: tx(dest, 'IE'), email: tx(dest, 'email'), ender: doo },
+    dest: { nome: tx(dest, 'xNome') || '—', doc: tx(dest, 'CNPJ') || tx(dest, 'CPF'), IE: tx(dest, 'IE'), ender: doo },
     fat: fat ? { vLiq: num(fat, 'vLiq') } : null, dups,
     tot: total ? { vBC: num(total, 'vBC'), vICMS: num(total, 'vICMS'), vBCST: num(total, 'vBCST'), vST: num(total, 'vST'), vProd: num(total, 'vProd'), vFrete: num(total, 'vFrete'), vSeg: num(total, 'vSeg'), vDesc: num(total, 'vDesc'), vII: num(total, 'vII'), vIPI: num(total, 'vIPI'), vPIS: num(total, 'vPIS'), vCOFINS: num(total, 'vCOFINS'), vOutro: num(total, 'vOutro'), vNF: num(total, 'vNF'), vTotTrib: num(total, 'vTotTrib') } : { vNF: 0 },
     reforma, problemasChave,

@@ -25,6 +25,13 @@ const { parseXML, renderDANFE } = app;
 const alerta = (doc, texto) =>
   doc.alertas.some((a) => a.texto.toLowerCase().includes(texto.toLowerCase()));
 
+test('Parser não carrega campos que o DANFE nunca imprime', () => {
+  const doc = parseXML(nfe({}), 'enxuto.xml');
+  assert.ok(!('email' in doc.dest), 'dest.email é dead data');
+  assert.ok(!('vDesc' in doc.itens[0]), 'vDesc do item é dead data');
+  assert.ok('vDesc' in doc.tot, 'Desconto do total (ICMSTot/vDesc) continua');
+});
+
 test('harness: a interface do site não roda durante os testes', () => {
   assert.equal(typeof app.parseXML, 'function');
 });
