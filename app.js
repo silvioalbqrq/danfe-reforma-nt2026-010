@@ -255,7 +255,7 @@ function parseNFe(xml, name) {
     tot: total ? { vBC: num(total, 'vBC'), vICMS: num(total, 'vICMS'), vBCST: num(total, 'vBCST'), vST: num(total, 'vST'), vProd: num(total, 'vProd'), vFrete: num(total, 'vFrete'), vSeg: num(total, 'vSeg'), vDesc: num(total, 'vDesc'), vII: num(total, 'vII'), vIPI: num(total, 'vIPI'), vPIS: num(total, 'vPIS'), vCOFINS: num(total, 'vCOFINS'), vOutro: num(total, 'vOutro'), vNF: num(total, 'vNF'), vTotTrib: num(total, 'vTotTrib') } : { vNF: 0 },
     reforma, problemasChave,
     alertas,
-    transp: transp ? (() => { const t = filhoDe(transp, 'transporta'); return { modFrete: tx(transp, 'modFrete'), tNome: tx(t, 'xNome'), tDoc: tx(t, 'CNPJ') || tx(t, 'CPF'), vols: filhosDe(transp).filter(v => v.nodeName === 'vol').map(v => ({ qVol: tx(v, 'qVol'), esp: tx(v, 'esp'), pesoB: tx(v, 'pesoB'), pesoL: tx(v, 'pesoL') })) }; })() : null,
+    transp: transp ? (() => { const t = filhoDe(transp, 'transporta'); const peso = v => { const b = tx(v, 'pesoB'), l = tx(v, 'pesoL'); return (b || l) ? ` (${[b && `B ${b}`, l && `L ${l}`].filter(Boolean).join(' / ')} kg)` : ''; }; return { modFrete: tx(transp, 'modFrete'), tNome: tx(t, 'xNome'), tDoc: tx(t, 'CNPJ') || tx(t, 'CPF'), vols: filhosDe(transp).filter(v => v.nodeName === 'vol').map(v => ({ qVol: tx(v, 'qVol'), esp: tx(v, 'esp'), peso: peso(v) })) }; })() : null,
     iss: issTot ? { vServ: num(issTot, 'vServ'), vISS: num(issTot, 'vISS') } : null,
     // infCpl e infAdFisco são campos diferentes do leiaute: o primeiro vai para
     // "Informações complementares", o segundo para "Reservado ao fisco". O código
@@ -281,9 +281,11 @@ function parseXML(text, name) {
 const chaveHtml = c => esc(fmtChave(c)).replace(/\./g, '.<wbr>');
 function barcodeSVG(chave) {
   const c = onlyD(chave);
-  if (c.length !== 44 || typeof JsBarcode === 'undefined') return `<div class="d-key">${chaveHtml(chave)}</div>`;
+  // Sem a biblioteca (offline/arquivo ausente), avisa em vez de degradar em silêncio.
+  const semBarra = `<div class="sem-barra">Código de barras indisponível — confira pela chave digitada</div>`;
+  if (c.length !== 44 || typeof JsBarcode === 'undefined') return `<div class="d-key">${chaveHtml(chave)}</div>${semBarra}`;
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  try { JsBarcode(svg, c, { format: 'CODE128C', displayValue: false, height: 46, margin: 0 }); } catch { return `<div class="d-key">${chaveHtml(chave)}</div>`; }
+  try { JsBarcode(svg, c, { format: 'CODE128C', displayValue: false, height: 46, margin: 0 }); } catch { return `<div class="d-key">${chaveHtml(chave)}</div>${semBarra}`; }
   return `<div class="d-bar">${svg.outerHTML}</div><div class="d-key">${chaveHtml(chave)}</div>`;
 }
 const FRETE = { '0': '0-Remetente', '1': '1-Destinatário', '2': '2-Terceiros', '9': '9-Sem frete' };
@@ -313,7 +315,7 @@ function renderDANFE(d) {
     return `<tr>
       <td>${String(it.cProd || '—').slice(0, 18)}</td><td><b>${esc(it.xProd)}</b>${it.infAdProd ? `<br><i>${esc(it.infAdProd).slice(0, 220)}</i>` : ''}</td>
       <td>${esc(it.NCM)}</td><td>${esc(it.CST)}</td><td>${esc(it.CFOP)}</td><td>${esc(it.uCom)}</td>
-      <td style="text-align:right">${esc(it.qCom)}</td><td style="text-align:right">${num4(it.vUnCom)}</td>
+      <td style="text-align:right">${esc(fmtQtd(it.qCom))}</td><td style="text-align:right">${num4(it.vUnCom)}</td>
       <td style="text-align:right">${num2(it.vProd)}</td><td style="text-align:right">${num2(it.BC)}</td>
       <td style="text-align:right">${num2(it.vICMS)}</td><td style="text-align:right">${num2(it.vIPI)}</td>
     </tr><tr class="reforma"><td colspan="12">${ref}</td></tr>`;
@@ -398,7 +400,7 @@ function renderDANFE(d) {
     <div class="d-sec green">Total do IBS / CBS / IS — Reforma Tributária (NT 2026.010)</div>
     ${blocoReforma}
     <div class="d-sec">Transportador / volumes</div>
-    <div class="d-row first"><div class="d-cell" style="flex:1"><div class="d-val norm">${d.transp ? `${esc(FRETE[d.transp.modFrete] || d.transp.modFrete)} · ${esc(transpId(d.transp))} · Vols: ${d.transp.vols.map(v => `${esc(v.qVol || '')} ${esc(v.esp || '')}`).join(' | ') || '—'}` : 'Frete conforme XML (sem informação quando em branco).'}</div></div></div>
+    <div class="d-row first"><div class="d-cell" style="flex:1"><div class="d-val norm">${d.transp ? `${esc(FRETE[d.transp.modFrete] || d.transp.modFrete)} · ${esc(transpId(d.transp))} · Vols: ${d.transp.vols.map(v => `${esc(v.qVol || '')} ${esc(v.esp || '')}${esc(v.peso || '')}`).join(' | ') || '—'}` : 'Frete conforme XML (sem informação quando em branco).'}</div></div></div>
     <div class="d-sec gold">Dados dos produtos / serviços + IBS · CBS · IS por item (NT 2026.010)</div>
     <table class="d-itens">
       <thead><tr><th>Cód</th><th>Descrição</th><th>NCM</th><th>CST</th><th>CFOP</th><th>UN</th><th>Qtd</th><th>V.Unit</th><th>V.Total</th><th>BC ICMS</th><th>V.ICMS</th><th>V.IPI</th></tr></thead>
@@ -448,19 +450,65 @@ function show() {
 }
 function refreshLoteActive() { loteList.querySelectorAll('.lote-item').forEach((b, i) => b.classList.toggle('active', i === cur)); }
 
+/* --- Lote: funções puras (testáveis) --- */
+/* Célula de CSV com defesa contra injeção de fórmula: texto que começa com
+   = + - @ Tab ou CR ganha apóstrofo, para o Excel não executar como fórmula. */
+function csvCelda(v) {
+  const s = String(v ?? '');
+  const perigosa = /^[=+\-@\t\r]/.test(s);
+  const comAspas = s.replace(/"/g, '""');
+  return `"${perigosa ? "'" + comAspas : comAspas}"`;
+}
+/* Chave "—"/vazia nunca é duplicata: só chave real de 44 dígitos conta. */
+function chaveJaNoLote(lista, chave) {
+  return !!chave && chave !== '—' && lista.some(d => d.chave === chave);
+}
+/* Um resumo só, em vez de um alert por arquivo. Vazio quando tudo entrou. */
+function montaResumo({ ok, dups, grandes, excesso, erros }) {
+  const partes = [];
+  if (grandes.length) partes.push(`${grandes.length} acima de 5 MB ignorados: ${grandes.join(', ')}`);
+  if (excesso.length) partes.push(`limite de ${MAX_FILES} documentos: ${excesso.length} não carregados`);
+  if (dups) partes.push(`${dups} duplicado(s) ignorados (mesma chave de acesso)`);
+  for (const e of erros) partes.push(e);
+  if (!partes.length) return '';
+  return `Carregados: ${ok}.\n` + partes.join('\n');
+}
+/* Restaura título/DOM quando a impressão termina (afterprint), com rede de
+   segurança de 5 s. Sem window (testes), executa na hora. */
+function aposImpressao(fn) {
+  if (typeof window === 'undefined' || !window.addEventListener) { fn(); return; }
+  let feito = false;
+  const umaVez = () => { if (feito) return; feito = true; window.removeEventListener('afterprint', umaVez); fn(); };
+  window.addEventListener('afterprint', umaVez);
+  setTimeout(umaVez, 5000);
+}
+/* Quantidade com vírgula decimal; texto não numérico passa cru. */
+function fmtQtd(q) {
+  const v = parseFloat(String(q ?? '').replace(',', '.'));
+  return isNaN(v) ? (q || '—') : num4(v);
+}
+
 async function handleFiles(files) {
-  let list = [...files].filter(f => /\.xml$/i.test(f.name));
-  if (!list.length) return alert('Selecione arquivos .xml de NF-e.');
-  list = list.filter(f => f.size <= MAX_BYTES);
-  if (docs.length + list.length > MAX_FILES) { alert(`Limite de ${MAX_FILES}.`); list = list.slice(0, MAX_FILES - docs.length); }
-  for (const f of list) {
+  const lista = [...files].filter(f => /\.xml$/i.test(f.name));
+  if (!lista.length) return alert('Selecione arquivos .xml de NF-e.');
+  const margem = Math.max(MAX_FILES - docs.length, 0);
+  const excesso = lista.length > margem ? lista.slice(margem).map(f => f.name) : [];
+  const candidatos = lista.slice(0, margem);
+  const grandes = candidatos.filter(f => f.size > MAX_BYTES).map(f => f.name);
+  let ok = 0, dups = 0;
+  const erros = [];
+  for (const f of candidatos.filter(f => f.size <= MAX_BYTES)) {
     try {
       const text = await f.text();
       if (/<!ENTITY|<!DOCTYPE[^>]*\[/i.test(text)) throw new Error('XML com DTD/ENTITY bloqueado');
-      docs.push(parseXML(text, f.name));
-    } catch (e) { alert(`${f.name}: ${e.message}`); }
+      const doc = parseXML(text, f.name);
+      if (chaveJaNoLote(docs, doc.chave)) { dups++; continue; }
+      docs.push(doc); ok++;
+    } catch (e) { erros.push(`${f.name}: ${e.message}`); }
   }
-  cur = Math.max(0, docs.length - list.length);
+  const resumo = montaResumo({ ok, dups, grandes, excesso, erros });
+  if (resumo) alert(resumo);
+  if (ok) cur = docs.length - ok;
   refreshLote();
   if (docs.length) $('#danfeArea').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
@@ -484,8 +532,8 @@ $('#btnPrint').onclick = () => {
   const d = docs[cur]; if (!d) return;
   const prev = document.title;
   document.title = printName(d);
+  aposImpressao(() => { document.title = prev; });
   window.print();
-  setTimeout(() => { document.title = prev; }, 500);
 };
 $('#btnPrintAll').onclick = () => {
   if (!docs.length) return;
@@ -493,14 +541,13 @@ $('#btnPrintAll').onclick = () => {
   const keep = paper.innerHTML;
   document.title = docs.length === 1 ? printName(docs[0]) : `Danfes_${docs.length}_documentos`;
   paper.innerHTML = `<div class="danfe-print-all">${docs.map(renderDANFE).join('')}</div>`;
+  aposImpressao(() => { paper.innerHTML = keep; document.title = prev; });
   window.print();
-  setTimeout(() => { paper.innerHTML = keep; document.title = prev; }, 500);
 };
 $('#btnCsv').onclick = () => {
   if (!docs.length) return;
-  const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const head = ['numero', 'serie', 'emissao', 'emitente', 'emit_doc', 'CRT', 'destinatario', 'dest_doc', 'vNF', 'vIBS', 'vCBS', 'vIS', 'tem_reforma', 'chave', 'protocolo'];
-  const lines = [head.join(';')].concat(docs.map(d => [d.nNF, d.serie, fmtData(d.dhEmi), d.emit.nome, d.emit.doc, d.emit.CRT, d.dest.nome, d.dest.doc, d.tot.vNF.toFixed(2), d.reforma.vIBS.toFixed(2), d.reforma.vCBS.toFixed(2), d.reforma.vIS.toFixed(2), d.reforma.temNoXML ? 'SIM' : 'NAO', d.chave, d.prot ? d.prot.nProt : 'SEM'].map(q).join(';')));
+  const lines = [head.join(';')].concat(docs.map(d => [d.nNF, d.serie, fmtData(d.dhEmi), d.emit.nome, d.emit.doc, d.emit.CRT, d.dest.nome, d.dest.doc, d.tot.vNF.toFixed(2), d.reforma.vIBS.toFixed(2), d.reforma.vCBS.toFixed(2), d.reforma.vIS.toFixed(2), d.reforma.temNoXML ? 'SIM' : 'NAO', d.chave, d.prot ? d.prot.nProt : 'SEM'].map(csvCelda).join(';')));
   const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'conferencia-danfe-reforma.csv'; a.click();
 };

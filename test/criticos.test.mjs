@@ -45,6 +45,58 @@ test('infCpl com metadado |md5| tem o hash filtrado e mantém o texto fiscal', (
   assert.match(html, /DOCUMENTO EMITIDO POR ME OU EPP/);
 });
 
+test('CSV: célula com =/+/-/@ recebe apóstrofo contra injeção de fórmula', () => {
+  assert.equal(app.csvCelda('=cmd|xx'), `"'=cmd|xx"`);
+  assert.equal(app.csvCelda('+cmd'), `"'+cmd"`);
+  assert.equal(app.csvCelda('-3'), `"'-3"`);
+  assert.equal(app.csvCelda('@x'), `"'@x"`);
+  assert.equal(app.csvCelda('NOME NORMAL'), '"NOME NORMAL"');
+  assert.equal(app.csvCelda('com "aspas"'), '"com ""aspas"""');
+});
+
+test('aposImpressao: sem window (testes) executa na hora', () => {
+  let chamou = 0;
+  app.aposImpressao(() => { chamou++; });
+  assert.equal(chamou, 1);
+});
+
+test('Lote: chave repetida é detectada, "—" nunca é duplicata', () => {
+  const docs = [{ chave: '111' }, { chave: '222' }];
+  assert.equal(app.chaveJaNoLote(docs, '222'), true);
+  assert.equal(app.chaveJaNoLote(docs, '333'), false);
+  assert.equal(app.chaveJaNoLote(docs, '—'), false);
+  assert.equal(app.chaveJaNoLote(docs, ''), false);
+});
+
+test('Lote: resumo agrega descartes e erros, vazio quando tudo ok', () => {
+  assert.equal(app.montaResumo({ ok: 2, dups: 0, grandes: [], excesso: [], erros: [] }), '');
+  const r = app.montaResumo({ ok: 1, dups: 1, grandes: ['g.xml'], excesso: ['e.xml'], erros: ['x.xml: ruim'] });
+  assert.match(r, /duplicado/i);
+  assert.match(r, /5 MB/);
+  assert.match(r, /limite/i);
+  assert.match(r, /x\.xml: ruim/);
+});
+
+test('Barcode indisponível avisa no DANFE em vez de degradar em silêncio', () => {
+  const html = renderDANFE(parseXML(nfe({}), 'barra.xml'));
+  assert.match(html, /sem-barra/);
+});
+
+test('fmtQtd: quantidade numérica sai com vírgula, texto passa cru', () => {
+  assert.equal(app.fmtQtd('13.0000'), '13,0000');
+  assert.equal(app.fmtQtd('2'), '2,0000');
+  assert.equal(app.fmtQtd('ABC'), 'ABC');
+});
+
+test('Transporte: pesos dos volumes aparecem quando o XML traz', () => {
+  const comVol = nfe({}).replace('</infNFe>',
+    '<transp><modFrete>1</modFrete><transporta><xNome>TRANS LTDA</xNome></transporta>' +
+    '<vol><qVol>3</qVol><esp>CX</esp><pesoB>30.5</pesoB><pesoL>28.1</pesoL></vol></transp></infNFe>');
+  const html = renderDANFE(parseXML(comVol, 'vol.xml'));
+  assert.match(html, /TRANS LTDA/);
+  assert.match(html, /30\.5|30,5/);
+});
+
 test('Protocolo: número e data saem de protNFe/infProt, não do nível protNFe', () => {
   const doc = parseXML(nfe({}), 'prot.xml');
 
