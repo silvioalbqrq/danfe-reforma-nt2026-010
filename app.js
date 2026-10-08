@@ -598,6 +598,36 @@ $('#btnCsv').onclick = () => {
   const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'conferencia-danfe-reforma.csv'; a.click();
 };
+/* Rodapé padrão Hub Fiscal: botão Copiar (Pix/Lightning) e link ver completa. */
+document.querySelectorAll('[data-copy]').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const el = document.getElementById(btn.getAttribute('data-copy'));
+    if (!el) return;
+    const texto = (el.getAttribute('data-full') || el.textContent || '').trim();
+    if (!texto) return;
+    try {
+      await navigator.clipboard.writeText(texto);
+      const antes = btn.textContent;
+      btn.textContent = 'Copiado!';
+      setTimeout(() => { btn.textContent = antes; }, 1500);
+    } catch (e) { console.warn('[DANFE] clipboard indisponível:', e && e.name); }
+  });
+});
+document.querySelectorAll('[data-reveal]').forEach(link => {
+  link.addEventListener('click', e => {
+    e.preventDefault();
+    const el = document.getElementById(link.getAttribute('data-reveal'));
+    if (!el) return;
+    const full = el.getAttribute('data-full') || '';
+    if (!el.getAttribute('data-short')) el.setAttribute('data-short', el.textContent);
+    const short = el.getAttribute('data-short');
+    const mostrandoTudo = el.textContent === full;
+    el.textContent = mostrandoTudo ? short : full;
+    link.textContent = mostrandoTudo
+      ? (link.getAttribute('data-reveal') === 'ln-address' ? 'ver invoice completa' : 'ver chave completa')
+      : 'ocultar';
+  });
+});
 
 }
 
