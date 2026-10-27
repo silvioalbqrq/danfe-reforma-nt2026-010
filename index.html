@@ -6,7 +6,7 @@
 <title>DANFE Reforma Tributária NT 2026.010 — Gerador local XML → DANFE</title>
 <meta name="description" content="Gere o DANFE no layout da Reforma Tributária (NT 2026.010 v1.00 sobre o leiaute da NT 2025.002 v1.52): bloco Total IBS/CBS/IS, cClassTrib, alíquotas e valores por item, CRT do emitente e QR Code. CNPJ alfanumérico (NT 2026.004). 100% local, pronto para GitHub Pages.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230f2a4a'/><text x='50' y='68' font-size='48' text-anchor='middle' fill='white' font-family='Arial' font-weight='bold'>D</text></svg>">
-<link rel="stylesheet" href="styles.css?v=20261026-01">
+<link rel="stylesheet" href="styles.css?v=20261026-02">
 <script src="vendor/jsbarcode.min.js"></script>
 <script src="vendor/qrcode.js"></script>
 </head>
@@ -112,6 +112,10 @@
     <div class="grid2">
       <div class="feat"><h3>DANFE — Ajuste SINIEF 07/05 + MOC NF-e v7 Anexo III</h3><p>Documento auxiliar: chave de acesso (44 caracteres, alfanumérica desde a NT 2026.004) + barcode CODE-128, protocolo de autorização, ambiente, contingência, emitente/destinatário, fatura, ICMS, transporte, itens, ISSQN e dados adicionais. Fonte mínima 6pt, A4 retrato.</p></div>
       <div class="feat"><h3>Reforma — EC 132/2023 · LC 214/2025 · NT 2026.010 v1.00</h3><p>A NT 2026.010 define como <b>IBS, CBS e IS</b> são demonstrados no DANFE, com implantação em produção em <b>01/12/2026</b>. O <b>leiaute</b> dos grupos é o da <b>NT 2025.002 v1.52</b> (produção em 03/11/2026). O IBS/CBS tem valor jurídico desde <b>01/01/2026</b> e preenchimento obrigatório em produção desde <b>03/08/2026</b>.</p></div>
+      <div class="feat"><h3>NT 2026.006 v1.00 — split payment</h3><p>O grupo <b>YC</b> (<code>gPgtoVinc</code>/<code>gPgto</code>) vincula a nota à transação de pagamento: <code>nPag</code> e <code>idTransacao</code> são <b>atributos</b>; meio de pagamento, CNPJ do recebedor e CNPJ-base do PSP são elementos. O DANFE imprime a vinculação quando ela existe e valida <code>idTransacao</code> duplicado (YC04-20), meio fora de 2 dígitos (YC05-10) e o DV do CNPJ do recebedor (YC06-10).</p></div>
+      <div class="feat"><h3>NT 2026.001 v1.02b — PAA</h3><p>Emissão por <b>Provedor de Assinatura e Autorização</b>: <code>procEmi=4</code>, série <b>970-989</b> e grupo <code>infPAA</code> com <code>CNPJPAA</code> e <code>PAASignature</code>. O DANFE identifica a nota como emitida por PAA; as RVs 450, 667, 668, 670, 867 e 893 são conferidas no XML e o número da RV aparece no alerta.</p></div>
+      <div class="feat"><h3>IT 2025.002 v1.70 — classificação tributária</h3><p>O <b>cClassTrib</b> tem <b>6 dígitos</b> e os <b>três primeiros são o CST</b> de IBS/CBS. O gerador confere essa forma — e a presença do campo no grupo <code>IBSCBS</code> (UB14) — e imprime também o <code>cClassTribIS</code> do Imposto Seletivo (UB03). A <b>existência</b> do código na tabela vigente não é conferida: a tabela é publicada em portal e em JSON, fora do PDF do IT.</p></div>
+      <div class="feat"><h3>MOC 7 Anexo III — contingência</h3><p>Cada modalidade tem texto próprio no DANFE: <b>FS-IA</b> (tpEmis 2), <b>EPEC</b> (4), <b>FS-DA</b> (5), <b>SVC-AN</b> (6) e <b>SVC-RS</b> (7), com o motivo (<code>xJust</code>) e o início (<code>dhCont</code>) impressos. <code>tpEmis=3</code> (SCAN, desativado) e <code>tpEmis=9</code> (contingência offline da NFC-e) são recusados no modelo 55; contingência sem justificativa é erro.</p></div>
     </div>
     <div class="alert">DANFE não tem valor fiscal isolado. A validade jurídica é do <b>XML autorizado</b> (guarde por 5 anos). Consulte pela chave em <b>nfe.fazenda.gov.br/portal</b>. Divergência entre DANFE e XML: vale o XML. <b>Nada é inferido:</b> total ausente no XML sai como “—”.</div>
   </section>
@@ -120,6 +124,10 @@
     <h2>Perguntas frequentes</h2>
     <details open><summary>Meu XML não tem IBS/CBS/IS. Está errado?</summary><p>Depende da data e do emitente. O preenchimento dos grupos de IBS/CBS é <b>obrigatório em produção desde 03/08/2026</b> para o CRT 3 (Regime Normal); para Simples Nacional, MEI e tributação monofásica a obrigatoriedade começa em 2027 (art. 348 da LC 214/2025). Documento anterior a 03/08/2026 pode não trazer os grupos: o DANFE apenas sinaliza “sem grupos de IBS/CBS/IS no XML”.</p></details>
     <details><summary>E o CNPJ alfanumérico?</summary><p>A NT 2026.004 já está em produção desde <b>01/07/2026</b>: o CNPJ e a chave de acesso podem ter letras. O gerador aceita os dois formatos, mascara o CNPJ corretamente e valida o dígito verificador módulo 11 sobre caracteres alfanuméricos.</p></details>
+    <details><summary>Meu XML tem <code>gPgtoVinc</code>? O que o DANFE mostra?</summary><p>Mostra a seção <b>Pagamento vinculado — split payment</b> com número do pagamento, identificador da transação, meio de pagamento e recebedor (CNPJ mascarado). Sem o grupo <code>gPgtoVinc</code> a seção não existe — nada é deduzido do <code>pag</code> tradicional nem do meio de pagamento. O grupo é <b>preparatório</b> na NT 2026.006: o documento continua válido sem ele.</p></details>
+    <details><summary>Nota emitida por PAA aparece diferente?</summary><p>Sim: com <code>procEmi=4</code> e <code>infPAA</code> o DANFE ganha a linha <b>Processo de emissão 4 - PAA</b>, com o CNPJ do provedor e a presença da assinatura. Se <code>procEmi=4</code> vier sem <code>infPAA</code>, sem a série 970-989 ou com CNPJ de DV inválido, o alerta aponta a RV correspondente (667, 670 e 867).</p></details>
+    <details><summary>O gerador confere se o <code>cClassTrib</code> existe na tabela?</summary><p>Não. O que o IT 2025.002 v1.70 traz em texto é a <b>forma</b>: 6 dígitos, com os três primeiros iguais ao CST de IBS/CBS — é isso que o gerador valida, além da obrigatoriedade do campo. A tabela oficial de códigos é publicada no portal do DF-e e em JSON; conferir a existência exigiria baixar essa tabela, o que o gerador, 100% local, não faz.</p></details>
+    <details><summary>Posso imprimir nota em contingência?</summary><p>Pode, mas o DANFE sai com a faixa da modalidade, o texto exigido pelo MOC 7 Anexo III, o motivo (<code>xJust</code>) e o início (<code>dhCont</code>). FS-IA e FS-DA só valem em formulário de segurança próprio; EPEC precisa ser transmitida à SEFAZ quando a falha cessar. <code>tpEmis=9</code> é da NFC-e e não é aceito no modelo 55.</p></details>
     <details><summary>Como salvo em PDF?</summary><p>Com o DANFE na tela, clique em <b>Imprimir / Salvar PDF</b> e escolha “Salvar como PDF”. A impressão sai em A4, só o DANFE.</p></details>
   </section>
 
@@ -127,7 +135,7 @@
     <div class="corp-inner footer-grid">
       <div>
         <strong class="ft">DANFE · Reforma Tributária</strong>
-        <p>Gerador local e open-source, conforme Ajuste SINIEF 07/05, MOC NF-e v7 e NT 2026.010 v1.00. O DANFE é auxiliar e sem valor fiscal isolado — a validade jurídica é do XML autorizado.</p>
+        <p>Gerador local e open-source, conforme Ajuste SINIEF 07/05, MOC NF-e v7 (Anexo III) e NTs 2026.010 v1.00, 2026.006 v1.00, 2026.001 v1.02b e IT 2025.002 v1.70. O DANFE é auxiliar e sem valor fiscal isolado — a validade jurídica é do XML autorizado.</p>
       </div>
       <div>
         <strong class="ft">Contato</strong>
@@ -147,6 +155,6 @@
   </footer>
 </main>
 
-<script src="app.js?v=20261026-01"></script>
+<script src="app.js?v=20261026-02"></script>
 </body>
 </html>

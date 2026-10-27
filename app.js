@@ -93,6 +93,8 @@ function reformaItem(imp) {
   const vCBS = gCBS ? num(gCBS, 'vCBS') : 0;
   const isEl = grupoDe(imp, ['IS', 'gIS']);
   const cstIS = isEl ? str(isEl, 'CSTIS') : '';
+  // NT 2025.002 UB03: o IS também tem classificação tributária própria (6 dígitos).
+  const cClassTribIS = isEl ? str(isEl, 'cClassTribIS') : '';
   const vBCIS = isEl ? num(isEl, 'vBCIS') : 0;
   const pIS = isEl ? num(isEl, 'pIS') : 0;
   const vIS = isEl ? num(isEl, 'vIS') : 0;
@@ -100,7 +102,7 @@ function reformaItem(imp) {
   const temIS = !!isEl;
   return {
     temIbsCbs, temIS, cClassTrib, cst, vBC, pIBSUF, pIBSMun, pCBS, efetiva,
-    vIBSUF, vIBSMun, vCBS, vIBSTot: vIBSUF + vIBSMun, cstIS, vBCIS, pIS, vIS,
+    vIBSUF, vIBSMun, vCBS, vIBSTot: vIBSUF + vIBSMun, cstIS, cClassTribIS, vBCIS, pIS, vIS,
     has: temIbsCbs || temIS
   };
 }
@@ -131,6 +133,21 @@ function digitoVerificador(base43) {
   }
   const d = 11 - (soma % 11);
   return d >= 10 ? 0 : d;
+}
+
+/* Dígito verificador do CNPJ: módulo 11 com os pesos 5,4,3,2,9,8,7,6,5,4,3,2
+   (e 6,5,4,3,2,9,8,7,6,5,4,3,2 para o segundo dígito). NT 2026.004: o CNPJ pode
+   ser alfanumérico e cada caractere vale o código ASCII menos 48. */
+function cnpjOk(doc) {
+  const c = soAlfanum(doc);
+  if (c.length !== 14 || /^0+$/.test(c)) return false;
+  const dv = base => {
+    const pesos = base.length === 12 ? [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2] : [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+    const soma = [...base].reduce((a, ch, i) => a + valorCaractere(ch) * pesos[i], 0);
+    const r = soma % 11;
+    return r < 2 ? 0 : 11 - r;
+  };
+  return dv(c.slice(0, 12)) === Number(c[12]) && dv(c.slice(0, 13)) === Number(c[13]);
 }
 
 /* A chave não é só um identificador: ela carrega UF, AAMM, CNPJ, modelo, série,
@@ -168,6 +185,9 @@ function validarChave(chave, ref) {
 function parseNFe(xml, name) {
   const scope = noDoc(xml, 'infNFe') || xml;
   const ide = filhoDe(scope, 'ide');
+  // Contingência (MOC 7 Anexo III): o XML declara o modo em tpEmis e o motivo em
+  // xJust/dhCont — os três têm de ser impressos no DANFE quando tpEmis ≠ 1.
+  const tpEmisIde = tx(ide, 'tpEmis', '1'), xJustIde = tx(ide, 'xJust'), dhContIde = tx(ide, 'dhCont');
   const emit = filhoDe(scope, 'emit');
   const dest = filhoDe(scope, 'dest');
   const eEmit = grupoDe(emit, ['enderEmit', 'enderEmi', 'ender']);
@@ -176,6 +196,24 @@ function parseNFe(xml, name) {
   const total = filhoDe(grupoTotal, 'ICMSTot'), issTot = filhoDe(grupoTotal, 'ISSQNtot');
   const transp = filhoDe(scope, 'transp');
   const infAdic = filhoDe(scope, 'infAdic');
+  // --- NT 2026.006: vinculação com a transação de pagamento (split payment) ---
+  // Grupo YC: <gPgtoVinc><gPgto nPag="1" idTransacao="…">. nPag e idTransacao são
+  // atributos; o resto são elementos. Campos preparatórios — sem exigência em 2026.
+  const gPgtoVinc = filhoDe(scope, 'gPgtoVinc');
+  const pagamentos = filhosDe(gPgtoVinc).filter(g => g.nodeName === 'gPgto').map(g => ({
+    nPag: (g.getAttribute && g.getAttribute('nPag')) || '',
+    idTransacao: (g.getAttribute && g.getAttribute('idTransacao')) || '',
+    tpMeioPgto: tx(g, 'tpMeioPgto'), CNPJReceb: tx(g, 'CNPJReceb'), CNPJBasePSP: tx(g, 'CNPJBasePSP')
+  }));
+  // --- NT 2026.001: Provedor de Assinatura e Autorização (PAA) ---
+  // Grupo ZG: <infPAA><CNPJPAA/><PAASignature><SignatureValue/><RSAKeyValue/></PAASignature>.
+  const infPAA = filhoDe(scope, 'infPAA');
+  const paaSig = filhoDe(infPAA, 'PAASignature');
+  const paa = infPAA ? {
+    cnpj: tx(infPAA, 'CNPJPAA'),
+    assinatura: !!tx(paaSig, 'SignatureValue'),
+    chave: !!(tx(filhoDe(paaSig, 'RSAKeyValue'), 'Modulus') && tx(filhoDe(paaSig, 'RSAKeyValue'), 'Exponent'))
+  } : null;
   const fat = filhoDe(scope, 'fat');
   const dups = filhosDe(fat).filter(d => d.nodeName === 'dup').map(d => ({ nDup: tx(d, 'nDup'), dVenc: fmtData(tx(d, 'dVenc')), vDup: num(d, 'vDup') }));
   const dets = filhosDe(scope).filter(d => d.nodeName === 'det');
@@ -296,6 +334,78 @@ function parseNFe(xml, name) {
     tpEmis: tx(ide, 'tpEmis', '1')
   });
   for (const p of problemasChave) alertas.push({ nivel: 'erro', campo: 'chave', texto: p });
+
+  // --- IT 2025.002 v1.70: forma do cClassTrib / cClassTribIS ---
+  // O Informe Técnico só publica a tabela online; o que ele fixa em texto é a forma:
+  // 6 dígitos, e os três primeiros idênticos ao CST de IBS/CBS. A existência do código
+  // na tabela vigente não é conferida aqui (a tabela é publicada em portal/JSON).
+  for (const it of itens) {
+    if (it.temIbsCbs) {
+      const cc = String(it.cClassTrib || '').trim();
+      if (!cc) {
+        alertas.push({ nivel: 'erro', campo: 'cClassTrib', texto: `Item ${it.nItem}: o grupo IBSCBS está preenchido sem cClassTrib — no leiaute o campo é obrigatório (UB14, NT 2025.002).` });
+      } else if (!/^\d{6}$/.test(cc)) {
+        alertas.push({ nivel: 'erro', campo: 'cClassTrib', texto: `Item ${it.nItem}: cClassTrib "${cc}" não tem 6 dígitos numéricos, como exige o IT 2025.002 v1.70.` });
+      } else if (/^\d{3}$/.test(it.cst) && cc.slice(0, 3) !== it.cst) {
+        alertas.push({ nivel: 'erro', campo: 'cClassTrib', texto: `Item ${it.nItem}: os três primeiros dígitos do cClassTrib (${cc.slice(0, 3)}) têm de ser iguais ao CST de IBS/CBS (${it.cst}) — IT 2025.002 v1.70.` });
+      }
+    }
+    if (it.temIS && it.cClassTribIS && !/^\d{6}$/.test(it.cClassTribIS)) {
+      alertas.push({ nivel: 'erro', campo: 'cClassTribIS', texto: `Item ${it.nItem}: cClassTribIS "${it.cClassTribIS}" não tem 6 dígitos numéricos (UB03, IT 2025.002 v1.70).` });
+    }
+  }
+
+  // --- NT 2026.001: regras do PAA que dependem só do XML ---
+  const procEmi = tx(ide, 'procEmi', '0');
+  const serie3 = String(tx(ide, 'serie', '1')).padStart(3, '0');
+  const nSerie = Number(serie3);
+  if (procEmi === '4') {
+    if (!paa) alertas.push({ nivel: 'erro', campo: 'PAA', texto: 'Processo de emissão 4 (PAA) sem o grupo infPAA — RV 867: grupo de informações do Provedor de Assinatura e Autorização não informado.' });
+    if (!(nSerie >= 970 && nSerie <= 989)) alertas.push({ nivel: 'erro', campo: 'PAA', texto: `Processo de emissão 4 (PAA) com série ${serie3}: as séries do PAA são 970-989 — RV 667.` });
+    if (String(tx(ide, 'mod', '55')) === '65') alertas.push({ nivel: 'erro', campo: 'PAA', texto: 'O PAA não emite NFC-e (modelo 65) — RV 450: modelo da NF-e diferente de 55.' });
+    if (paa && !cnpjOk(paa.cnpj)) alertas.push({ nivel: 'erro', campo: 'PAA', texto: `CNPJ do PAA inválido: "${paa.cnpj || '—'}" — RV 670.` });
+    if (['2', '3'].includes(tx(emit, 'CRT'))) alertas.push({ nivel: 'erro', campo: 'PAA', texto: 'Emissão por PAA não é permitida ao contribuinte do regime normal (CRT 2 ou 3) — RV 668.' });
+  } else if (paa) {
+    alertas.push({ nivel: 'erro', campo: 'PAA', texto: `O grupo infPAA só pode existir com processo de emissão 4 (PAA); o XML informa procEmi ${procEmi} — RV 893: grupo informado indevidamente.` });
+  }
+
+  // --- NT 2026.006: forma do grupo de vinculação de pagamento ---
+  const vistos = new Set();
+  for (const p of pagamentos) {
+    const id = p.idTransacao;
+    if (id && vistos.has(id)) alertas.push({ nivel: 'erro', campo: 'gPgtoVinc', texto: `idTransacao "${id}" duplicado no grupo de vinculação — o schema impede duplicidade (YC04-20).` });
+    if (id) vistos.add(id);
+    if (!/^\d{2}$/.test(p.tpMeioPgto)) alertas.push({ nivel: 'erro', campo: 'gPgtoVinc', texto: `Pagamento ${p.nPag || '—'}: meio de pagamento "${p.tpMeioPgto || '—'}" inválido — a tabela nacional usa código de 2 dígitos (YC05-10).` });
+    if (p.CNPJReceb && !cnpjOk(p.CNPJReceb)) alertas.push({ nivel: 'erro', campo: 'gPgtoVinc', texto: `Pagamento ${p.nPag || '—'}: CNPJ do recebedor "${p.CNPJReceb}" inválido — YC06-10.` });
+  }
+
+  // --- MOC 7 Anexo III: contingência ---
+  const CONTING = {
+    '2': { modo: 'FS-IA', papel: 'FS-IA (Convênio ICMS 58/95)' },
+    '4': { modo: 'EPEC', papel: 'papel comum' },
+    '5': { modo: 'FS-DA', papel: 'FS-DA (Convênio ICMS 110/08)' },
+    '6': { modo: 'SVC-AN', papel: 'papel comum' },
+    '7': { modo: 'SVC-RS', papel: 'papel comum' }
+  };
+  if (tpEmisIde !== '1') {
+    const c = CONTING[tpEmisIde];
+    if (tpEmisIde === '9') {
+      alertas.push({ nivel: 'erro', campo: 'tpEmis', texto: 'tpEmis=9 é a contingência offline da NFC-e (modelo 65): o MOC 7 Anexo III não prevê esse código para o modelo 55.' });
+    } else if (tpEmisIde === '3') {
+      alertas.push({ nivel: 'erro', campo: 'tpEmis', texto: 'tpEmis=3 (SCAN) foi desativado e não consta entre as modalidades do MOC 7 Anexo III.' });
+    } else if (!c) {
+      alertas.push({ nivel: 'erro', campo: 'tpEmis', texto: `tpEmis=${tpEmisIde} não corresponde a nenhuma modalidade do MOC 7 Anexo III (1, 2, 4, 5, 6, 7).` });
+    }
+    if (!xJustIde || !dhContIde) {
+      alertas.push({ nivel: 'erro', campo: 'tpEmis', texto: 'Em contingência, o motivo (xJust) e a data/hora de início (dhCont) têm de constar no XML e ser impressos no DANFE — MOC 7 Anexo III.' });
+    }
+    if (tpEmisIde === '2' || tpEmisIde === '5') {
+      alertas.push({ nivel: 'aviso', campo: 'tpEmis', texto: `tpEmis=${tpEmisIde} exige DANFE em ${CONTING[tpEmisIde].papel}: papel comum torna a impressão irregular (MOC 7 Anexo III, 2.2.3).` });
+    }
+    if (tpEmisIde === '4') {
+      alertas.push({ nivel: 'aviso', campo: 'tpEmis', texto: 'EPEC: a NF-e precisa ser transmitida à SEFAZ de origem assim que cessar a falha (MOC 7 Anexo III, 2.3.1).' });
+    }
+  }
   const protEl = noDoc(xml, 'protNFe');
   // nProt e dhRecbto moram em <protNFe><infProt>, não como filhos diretos de <protNFe>.
   // Ler no nível errado deixava o protocolo em branco ("· —") sem acusar SEM PROTOCOLO.
@@ -314,6 +424,11 @@ function parseNFe(xml, name) {
     fileName: name, chave: chave || '—', nNF: tx(ide, 'nNF'), serie: String(tx(ide, 'serie', '1')).padStart(3, '0'),
     natOp: tx(ide, 'natOp'), dhEmi: tx(ide, 'dhEmi') || tx(ide, 'dEmi'), dhSai: tx(ide, 'dhSaiEnt'),
     tpNF: tx(ide, 'tpNF', '1'), tpAmb: tx(ide, 'tpAmb', '1'), tpEmis: tx(ide, 'tpEmis', '1'), tpImp: tx(ide, 'tpImp', '1'),
+    procEmi,
+    // MOC 7 Anexo III: sem xJust/dhCont a faixa de contingência não tem o que imprimir.
+    xJust: xJustIde, dhCont: dhContIde,
+    // NT 2026.006 e NT 2026.001: grupos que ficam como filho direto de <infNFe>.
+    pagamentos, temPgtoVinc: !!gPgtoVinc, paa,
     emit: { nome: tx(emit, 'xNome'), doc: tx(emit, 'CNPJ') || tx(emit, 'CPF'), IE: tx(emit, 'IE'), IEST: tx(emit, 'IEST'), IM: tx(emit, 'IM'), CRT: tx(emit, 'CRT'), ender: eo },
     dest: { nome: tx(dest, 'xNome') || '—', doc: tx(dest, 'CNPJ') || tx(dest, 'CPF'), IE: tx(dest, 'IE'), ender: doo },
     fat: fat ? { vLiq: num(fat, 'vLiq') } : null, dups,
@@ -399,10 +514,31 @@ function renderDANFE(d) {
   const eo = d.emit.ender || {}, doo = d.dest.ender || {};
   const endEmit = `${eo.lgr || ''}${eo.nro ? ', ' + eo.nro : ''} - ${eo.bairro || ''} - ${eo.mun || ''}/${eo.uf || ''} ${eo.cep ? 'CEP ' + eo.cep : ''}`.replace(/^[ -]+/, '');
   const endDest = `${doo.lgr || ''}${doo.nro ? ', ' + doo.nro : ''} - ${doo.bairro || ''} - ${doo.mun || ''}/${doo.uf || ''}`.replace(/^[ -]+/, '');
+  // MOC 7 Anexo III: cada modalidade de contingência tem texto próprio no DANFE, e o
+  // motivo (xJust) e o início (dhCont) precisam sair impressos. Um texto genérico
+  // "contingência — veja o XML" descumpre o manual em todas as modalidades.
+  const CONT_RENDER = {
+    '2': ['FS-IA', 'DANFE em contingência — emitido em Formulário de Segurança FS-IA (Convênio ICMS 58/95).'],
+    '3': ['SCAN', 'Modalidade SCAN desativada: o DANFE não acoberta a mercadoria.'],
+    '4': ['EPEC', 'DANFE impresso em contingência - EPEC regularmente recebida pela Receita Federal do Brasil.'],
+    '5': ['FS-DA', 'DANFE em Contingência - impresso em decorrência de problemas técnicos. Formulário de Segurança FS-DA (Convênio ICMS 110/08).'],
+    '6': ['SVC-AN', 'DANFE impresso em contingência — SVC-AN, SEFAZ Virtual de Contingência do Ambiente Nacional.'],
+    '7': ['SVC-RS', 'DANFE impresso em contingência — SVC-RS, SEFAZ Virtual de Contingência do Rio Grande do Sul.'],
+    '9': ['tpEmis 9', 'Código de contingência offline da NFC-e — não previsto para o modelo 55.']
+  };
+  const conting = (d.tpEmis && d.tpEmis !== '1')
+    ? (CONT_RENDER[d.tpEmis] || [`tpEmis ${d.tpEmis}`, 'Modalidade de emissão não prevista no MOC 7 Anexo III.'])
+    : null;
+  const faixaCont = conting
+    ? `<div class="stripe cont"><b>EMISSÃO EM CONTINGÊNCIA — ${esc(conting[0])}</b><br>${esc(conting[1])}`
+      + (d.xJust ? `<br>Motivo: ${esc(d.xJust)}` : '')
+      + (d.dhCont ? ` &nbsp;·&nbsp; Início: ${esc(fmtData(d.dhCont))} ${esc(fmtHora(d.dhCont))}` : '')
+      + `</div>`
+    : '';
   const stripes =
     (String(d.tpImp) === '6' ? `<div class="stripe simpl">DANFE SIMPLIFICADO — Tipo 2 (tpImp=6, NT 2026.002)</div>` : '') +
     (d.tpAmb === '2' ? `<div class="stripe hom">SEM VALOR FISCAL — AMBIENTE DE HOMOLOGAÇÃO (tpAmb=2)</div>` : '') +
-    ((d.tpEmis && d.tpEmis !== '1') ? `<div class="stripe cont">EMISSÃO EM CONTINGÊNCIA — tpEmis ${esc(d.tpEmis)} · consulte o XML / EPEC</div>` : '') +
+    faixaCont +
     (!d.prot ? `<div class="stripe noprot">SEM PROTOCOLO DE AUTORIZAÇÃO NO XML — não transite com a mercadoria</div>` : '');
   // NT 2026.002: o DANFE Simplificado (tpImp=6) não tem canhoto.
   const simplificado = String(d.tpImp) === '6';
@@ -417,6 +553,7 @@ function renderDANFE(d) {
     const idReforma = [
       it.temIbsCbs ? `cClassTrib <b>${esc(it.cClassTrib || '—')}</b> · CST IBS/CBS <b>${esc(it.cst || '—')}</b>` : '',
       it.temIS ? `CST IS <b>${esc(it.cstIS || '—')}</b>` : '',
+      it.temIS && it.cClassTribIS ? `cClassTribIS <b>${esc(it.cClassTribIS)}</b>` : '',
       it.efetiva ? '<span class="tag">alíquota efetiva</span>' : ''
     ].filter(Boolean).join(' · ');
     return `<tr class="item">
@@ -479,6 +616,7 @@ function renderDANFE(d) {
       <div class="d-cell" style="width:30%"><span class="d-lab">CNPJ / CPF + CRT</span><div class="d-val">${esc(maskDoc(d.emit.doc))} <span class="tag crt">${esc(crtTexto(d.emit.CRT))}</span></div></div>
       <div class="d-cell" style="width:28%"><span class="d-lab">Tipo de Regime de Apuração do IBS e da CBS</span><div class="d-val norm">— <span class="tag">campo reservado na NT</span></div></div>
     </div>
+    ${(d.procEmi === '4' || d.paa) ? `<div class="d-row"><div class="d-cell" style="flex:1"><span class="d-lab">Processo de emissão</span><div class="d-val norm">4 - PAA (Provedor de Assinatura e Autorização — NT 2026.001)${d.paa ? ` · CNPJ do PAA ${esc(maskDoc(d.paa.cnpj))}${d.paa.assinatura ? ' · assinatura RSA presente' : ' · sem PAASignature'}` : ' · infPAA ausente no XML'}</div></div></div>` : ''}
     <div class="d-sec">Destinatário / remetente</div>
     <div class="d-row first">
       <div class="d-cell" style="flex:1.5"><span class="d-lab">Nome / razão social</span><div class="d-val">${esc(d.dest.nome)}</div></div>
@@ -500,6 +638,8 @@ function renderDANFE(d) {
     </div>
     <div class="d-sec">Fatura / duplicatas</div>
     <div class="d-row first"><div class="d-cell" style="flex:1"><div class="d-val norm">${d.dups.length ? d.dups.map(p => `Nº ${esc(p.nDup || '—')} · Venc ${esc(p.dVenc)} · ${fmtBRL(p.vDup)}`).join(' &nbsp;|&nbsp; ') : '—'}</div></div></div>
+    ${(d.pagamentos && d.pagamentos.length) ? `<div class="d-sec">Pagamento vinculado — split payment (NT 2026.006)</div>
+    <div class="d-row first"><div class="d-cell" style="flex:1"><div class="d-val norm">${d.pagamentos.map(p => `Pagamento ${esc(p.nPag || '—')} · transação ${esc(p.idTransacao || '—')} · meio ${esc(p.tpMeioPgto || '—')}${p.CNPJReceb ? ` · recebedor ${esc(maskDoc(p.CNPJReceb))}` : ''}${p.CNPJBasePSP ? ` · PSP base ${esc(p.CNPJBasePSP)}` : ''}`).join('<br>')}</div></div></div>` : ''}
     <div class="d-sec">Cálculo do imposto (valores do XML)</div>
     <div class="d-row first">
       <div class="d-cell" style="flex:1"><span class="d-lab">BC ICMS</span><div class="d-val">${num2(d.tot.vBC)}</div></div>

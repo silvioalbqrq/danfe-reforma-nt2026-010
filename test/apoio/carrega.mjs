@@ -101,6 +101,9 @@ export function nfe({
   emit = EMIT,
   dest = DEST,
   prot = '<protNFe><infProt><nProt>135260000000001</nProt><dhRecbto>2026-11-20T10:01:00-03:00</dhRecbto></infProt></protNFe>',
+  /* Grupos que ficam como filho direto de <infNFe> — gPgtoVinc (NT 2026.006) e
+     infPAA (NT 2026.001). Ficam fora do `imposto` porque não são tributo. */
+  extras = '',
 } = {}) {
   const id = `NFe${chaveValidaDe()}`.replace(/#/g, '');
   const idFinal = chave === null ? id : `NFe${chave}`;
@@ -115,6 +118,7 @@ ${dest}
 ${imposto}
 </det>
 <total>${total}</total>
+${extras}
 ${infAdic}
 </infNFe></NFe>
 ${prot}
