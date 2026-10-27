@@ -16,7 +16,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { carregarApp, contextoLimpo, nfe, chaveValidaDe, ICMS_SEM_RTC, ICMS_COM_IS, UB_ANTES_DO_ICMS }
+import { carregarApp, contextoLimpo, nfe, chaveValidaDe, chaveAlfaDe, ICMS_SEM_RTC, ICMS_COM_IS, UB_ANTES_DO_ICMS }
   from './apoio/carrega.mjs';
 
 const app = contextoLimpo(carregarApp());
@@ -85,7 +85,7 @@ test('NT §4.3: compra governamental sem pAliqEfet não inventa efetiva', () => 
 
 test('NT §4.1: totais monofásicos do XML aparecem no bloco', () => {
   const total = `<ICMSTot><vProd>20.00</vProd><vNF>20.00</vNF></ICMSTot>
-    <W03><vIBS>2.00</vIBS><vCBS>18.00</vCBS><vIBSMono>2.00</vIBSMono><vCBSMono>3.00</vCBSMono></W03>`;
+    <IBSCBSTot><gIBS><vIBS>2.00</vIBS></gIBS><gCBS><vCBS>18.00</vCBS></gCBS><gMono><vIBSMono>2.00</vIBSMono><vCBSMono>3.00</vCBSMono></gMono></IBSCBSTot>`;
   const doc = parseXML(nfe({ total }), 'mono.xml');
 
   assert.equal(doc.reforma.vIBSMono, 2);
@@ -111,7 +111,7 @@ test('NT §4.1: IBS UF e IBS Mun saem separados quando o XML discrimina', () => 
     </IBSCBS>
   </imposto>`;
   const total = `<ICMSTot><vProd>20.00</vProd><vNF>20.00</vNF></ICMSTot>
-    <W03><vIBSUF>2.00</vIBSUF><vIBSMun>1.00</vIBSMun><vCBS>18.00</vCBS></W03>`;
+    <IBSCBSTot><gIBS><gIBSUF><vIBSUF>2.00</vIBSUF></gIBSUF><gIBSMun><vIBSMun>1.00</vIBSMun></gIBSMun><vIBS>3.00</vIBS></gIBS><gCBS><vCBS>18.00</vCBS></gCBS></IBSCBSTot>`;
   const doc = parseXML(nfe({ imposto, total }), 'ufmun.xml');
 
   assert.equal(doc.reforma.vIBSUF, 2);
@@ -119,7 +119,7 @@ test('NT §4.1: IBS UF e IBS Mun saem separados quando o XML discrimina', () => 
   assert.match(renderDANFE(doc), /IBS UF/);
 });
 
-test('NT §4.1: sem UF/Mun no XML, a soma dos itens preenche com origem declarada', () => {
+test('NT 2026.010: sem UF/Mun no XML, o campo fica em branco em vez de somar os itens', () => {
   const imposto = `<imposto>
     <ICMS><ICMS00><CST>00</CST><vBC>20.00</vBC></ICMS00></ICMS>
     <IBSCBS><CST>000</CST><cClassTrib>000001</cClassTrib>
@@ -130,16 +130,31 @@ test('NT §4.1: sem UF/Mun no XML, a soma dos itens preenche com origem declarad
     </IBSCBS>
   </imposto>`;
   const total = `<ICMSTot><vProd>20.00</vProd><vNF>20.00</vNF></ICMSTot>
-    <W03><vIBS>0.02</vIBS><vCBS>0.18</vCBS></W03>`;
-  const doc = parseXML(nfe({ imposto, total }), 'somauf.xml');
+    <IBSCBSTot><gIBS><vIBS>0.02</vIBS></gIBS><gCBS><vCBS>0.18</vCBS></gCBS></IBSCBSTot>`;
+  const doc = parseXML(nfe({ imposto, total }), 'semuf.xml');
 
-  assert.equal(doc.reforma.vIBSUF, 0.02);
-  assert.equal(doc.reforma.origem.vIBSUF, 'itens');
+  // A NT 2026.010 veda inferir informação que não esteja no XML: "0,02" só existiria
+  // porque o gerador somou os itens, não porque o arquivo declarou.
+  assert.equal(doc.reforma.vIBSUF, null);
+  assert.equal(doc.reforma.origem.vIBSUF, 'ausente');
+  assert.ok(alerta(doc, 'não traz'), 'a ausência precisa ser avisada');
+  const html = renderDANFE(doc);
+  assert.doesNotMatch(html, /soma dos itens/);
 });
 
-test('NT: quadro de Dados Adicionais reserva espaço para o QR Code', () => {
-  const html = renderDANFE(parseXML(nfe({}), 'qr.xml'));
-  assert.match(html, /QR Code/);
+test('NT 2026.010: QR Code do XML é desenhado, não vira "regulamentação futura"', () => {
+  const qr = 'https://www.nfe.fazenda.gov.br/portal/consulta.aspx?chave=35261112345678000195550010000004561000004568';
+  const comQr = nfe({}).replace('</infNFe>', `</infNFe><infNFeSupl><qrCode>${qr}</qrCode></infNFeSupl>`);
+  const doc = parseXML(comQr, 'qr.xml');
+
+  assert.equal(doc.qr, qr);
+  const html = renderDANFE(doc);
+  assert.match(html, /class="qr"/, 'o QR Code tem de ser desenhado em SVG');
+  assert.doesNotMatch(html, /regulamentaç/i);
+
+  // Sem QR Code no XML, o campo informa a ausência — não inventa um código.
+  const semQr = renderDANFE(parseXML(nfe({}), 'semqr.xml'));
+  assert.match(semQr, /não informado no XML/);
 });
 
 test('Parser não carrega campos que o DANFE nunca imprime', () => {
@@ -253,8 +268,9 @@ test('F1: item só com Imposto Seletivo não recebe o CST do ICMS como CST de IB
     'sem grupo IBS/CBS no item, o CST de IBS/CBS tem de ser ausente, não o do ICMS');
 
   const html = renderDANFE(doc);
-  assert.doesNotMatch(html, /IBS 00/, 'o DANFE não pode anunciar um CST de IBS/CBS que o XML não tem');
-  assert.match(html, /IS 10/, 'o CST do Imposto Seletivo tem de continuar aparecendo');
+  assert.doesNotMatch(html, /CST IBS\/CBS/,
+    'o DANFE não pode anunciar um CST de IBS/CBS que o XML não tem');
+  assert.match(html, /CST IS <b>10<\/b>/, 'o CST do Imposto Seletivo tem de continuar aparecendo');
 });
 
 test('F1: item com grupo IBS/CBS próprio continua mostrando o CST dele', () => {
@@ -267,7 +283,7 @@ test('F1: item com grupo IBS/CBS próprio continua mostrando o CST dele', () => 
   const doc = parseXML(nfe({ imposto }), 'f1b.xml');
 
   assert.equal(doc.itens[0].cst, '000');
-  assert.match(renderDANFE(doc), /IBS 000/);
+  assert.match(renderDANFE(doc), /CST IBS\/CBS <b>000<\/b>/);
 });
 
 // ---------------------------------------------------------------------------
@@ -349,7 +365,7 @@ test('F4: total declarado no XML que não bate com a soma dos itens é sinalizad
     </IBSCBS>
   </imposto>`;
   const total = `<ICMSTot><vProd>20.00</vProd><vNF>20.00</vNF></ICMSTot>
-    <W03><vIBS>0.00</vIBS><vCBS>0.00</vCBS></W03>`;
+    <IBSCBSTot><gIBS><vIBS>0.00</vIBS></gIBS><gCBS><vCBS>0.00</vCBS></gCBS></IBSCBSTot>`;
   const doc = parseXML(nfe({ imposto, total }), 'f4.xml');
 
   assert.ok(alerta(doc, 'cbs'),
@@ -365,7 +381,7 @@ test('F4: o total impresso é o declarado no XML, nunca a soma inferida', () => 
     </IBSCBS>
   </imposto>`;
   const total = `<ICMSTot><vProd>20.00</vProd><vNF>20.00</vNF></ICMSTot>
-    <W03><vIBS>0.00</vIBS><vCBS>0.00</vCBS></W03>`;
+    <IBSCBSTot><gIBS><vIBS>0.00</vIBS></gIBS><gCBS><vCBS>0.00</vCBS></gCBS></IBSCBSTot>`;
   const doc = parseXML(nfe({ imposto, total }), 'f4b.xml');
 
   assert.equal(doc.reforma.vCBS, 0, 'o XML declara 0.00; o DANFE não pode mostrar a soma dos itens');
@@ -373,7 +389,7 @@ test('F4: o total impresso é o declarado no XML, nunca a soma inferida', () => 
   assert.match(renderDANFE(doc), /0,00/);
 });
 
-test('F4: XML sem grupo de totais soma os itens e assume que a soma foi calculada', () => {
+test('F4: XML sem grupo de totais deixa o campo em branco e avisa a ausência', () => {
   const imposto = `<imposto>
     <ICMS><ICMS00><CST>00</CST><vBC>20.00</vBC></ICMS00></ICMS>
     <IBSCBS><CST>000</CST><cClassTrib>000001</cClassTrib>
@@ -382,9 +398,12 @@ test('F4: XML sem grupo de totais soma os itens e assume que a soma foi calculad
   </imposto>`;
   const doc = parseXML(nfe({ imposto, total: '<ICMSTot><vProd>20.00</vProd><vNF>20.00</vNF></ICMSTot>' }), 'f4c.xml');
 
-  assert.equal(doc.reforma.vCBS, 0.18, 'sem totais declarados, a soma dos itens é o melhor estimativa');
-  assert.ok(alerta(doc, 'calculad') || alerta(doc, 'somad') || alerta(doc, 'itens'),
-    `a origem do total tem de ser declarada no DANFE; alertas: ${JSON.stringify(doc.alertas)}`);
+  assert.equal(doc.reforma.vCBS, null, 'sem totais declarados, o campo não é preenchido por estimativa');
+  assert.equal(doc.reforma.origem.vCBS, 'ausente');
+  assert.ok(alerta(doc, 'calculad') || alerta(doc, 'não traz o total') || alerta(doc, 'itens'),
+    `a ausência do total tem de ser declarada; alertas: ${JSON.stringify(doc.alertas)}`);
+  assert.doesNotMatch(renderDANFE(doc), /soma dos itens/,
+    'o DANFE não pode apresentar uma soma de itens como se fosse total declarado');
 });
 
 test('F4: totais do XML em concordância com os itens não geram aviso', () => {
@@ -398,7 +417,7 @@ test('F4: totais do XML em concordância com os itens não geram aviso', () => {
     </IBSCBS>
   </imposto>`;
   const total = `<ICMSTot><vProd>20.00</vProd><vNF>20.00</vNF></ICMSTot>
-    <W03><vIBS>2.00</vIBS><vCBS>18.00</vCBS></W03>`;
+    <IBSCBSTot><gIBS><gIBSUF><vIBSUF>2.00</vIBSUF></gIBSUF><vIBS>2.00</vIBS></gIBS><gCBS><vCBS>18.00</vCBS></gCBS></IBSCBSTot>`;
   const doc = parseXML(nfe({ imposto, total }), 'f4d.xml');
 
   assert.equal(doc.reforma.vIBS, 2);

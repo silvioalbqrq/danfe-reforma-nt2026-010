@@ -15,6 +15,10 @@ import { DOMParserShim } from './dom-xml.mjs';
 
 const ALVOS = ['document', 'window', 'alert', 'confirm', 'prompt', 'scrollIntoView'];
 
+/* O gerador de QR Code também roda no contexto de teste: sem ele, o DANFE cairia no
+   aviso "biblioteca ausente" e o teste do QR Code não provaria nada. */
+const QR_LIB = readFileSync(new URL('../../vendor/qrcode.js', import.meta.url), 'utf8');
+
 export function carregarApp() {
   const fonte = readFileSync(new URL('../../app.js', import.meta.url), 'utf8');
   const contexto = vm.createContext({
@@ -23,6 +27,7 @@ export function carregarApp() {
     Blob,
     URL,
   });
+  vm.runInContext(QR_LIB, contexto, { filename: 'qrcode.js' });
   vm.runInContext(fonte, contexto, { filename: 'app.js' });
   return contexto;
 }
@@ -63,16 +68,24 @@ export function chaveValidaDe(opcoes = {}) {
   return base.slice(0, 43) + dv;
 }
 
-/** Módulo 11 com pesos 2..9 da direita para a esquerda, sobre 43 dígitos. */
+/** Módulo 11 com pesos 2..9 da direita para a esquerda, sobre 43 caracteres.
+ *  NT 2026.004: letras valem o código ASCII menos 48, como no CNPJ alfanumérico. */
 export function digitoVerificador(base43) {
   let soma = 0;
   let peso = 2;
   for (let i = base43.length - 1; i >= 0; i--) {
-    soma += Number(base43[i]) * peso;
+    soma += (base43.charCodeAt(i) - 48) * peso;
     peso = peso === 9 ? 2 : peso + 1;
   }
   const d = 11 - (soma % 11);
   return d >= 10 ? '0' : String(d);
+}
+
+/** Chave de acesso com CNPJ alfanumérico (NT 2026.004). */
+export function chaveAlfaDe(opcoes = {}) {
+  const cnpj = opcoes.cnpj ?? '12ABC34501DE35';
+  const base = `${opcoes.cUF ?? '35'}${opcoes.aamm ?? '2611'}${cnpj}${opcoes.mod ?? '55'}${(opcoes.serie ?? '1').padStart(3, '0')}${(opcoes.nNF ?? '456').padStart(9, '0')}${opcoes.tpEmis ?? '1'}${'0'.repeat(8)}`;
+  return base.slice(0, 43) + digitoVerificador(base.slice(0, 43));
 }
 
 /**
@@ -117,9 +130,9 @@ export const ICMS_COM_IS = `<imposto>
   <IS><CSTIS>10</CSTIS><cClassTribIS>000001</cClassTribIS><vBCIS>20.00</vBCIS><pIS>5.00</pIS><vIS>1.00</vIS></IS>
 </imposto>`;
 
-/** Mesmo ICMS, porem o grupo `UB` de IBS/CBS vem ANTES do ICMS dentro de `<imposto>`. */
+/** Mesmo ICMS, porém o grupo `IBSCBS` de IBS/CBS vem ANTES do ICMS dentro de `<imposto>`. */
 export const UB_ANTES_DO_ICMS = `<imposto>
-  <UB><gIBSCBS><vBC>555.00</vBC><gIBSUF><pIBSUF>0.10</pIBSUF><vIBSUF>0.56</vIBSUF></gIBSUF>
-    <gCBS><pCBS>0.90</pCBS><vCBS>50.00</vCBS></gCBS></gIBSCBS></UB>
+  <IBSCBS><CST>000</CST><cClassTrib>000001</cClassTrib><gIBSCBS><vBC>555.00</vBC><gIBSUF><pIBSUF>0.10</pIBSUF><vIBSUF>0.56</vIBSUF></gIBSUF>
+    <gCBS><pCBS>0.90</pCBS><vCBS>50.00</vCBS></gCBS></gIBSCBS></IBSCBS>
   <ICMS><ICMS00><CST>00</CST><vBC>7000.00</vBC><pICMS>18.00</pICMS><vICMS>1260.00</vICMS></ICMS00></ICMS>
 </imposto>`;

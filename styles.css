@@ -112,33 +112,54 @@ summary{cursor:pointer;font-weight:800}
 .d-sec{background:var(--navy);color:#fff;font-weight:bold;font-size:9px;padding:3px 6px;text-transform:uppercase;letter-spacing:.3px;margin-top:5px;border:1px solid var(--navy)}
 .d-sec.gold{background:#8a6d00;border-color:#8a6d00}
 .d-sec.green{background:#0e7a4f;border-color:#0e7a4f}
-.d-key{font-size:12px;letter-spacing:1px}
+.d-key{font-size:11px;letter-spacing:1px}
 .d-bar{text-align:center;padding:2px}
 .d-bar svg,.d-bar canvas{max-width:100%;height:52px}
-.sem-barra{font-size:7.5px;color:#991b1b;font-weight:bold;padding:2px}
+.sem-barra{font-size:8px;color:#991b1b;font-weight:bold;padding:2px}
 .stripe{padding:5px 8px;font-weight:bold;font-size:10px;text-align:center;border:1px solid #000;border-top:0}
-.stripe.hom{background:#fee2e2;color:#991b1b;font-size:12px}
+.stripe.hom{background:#fee2e2;color:#991b1b;font-size:11px}
 .stripe.cont{background:#fef3c7;color:#92400e}
+.stripe.simpl{background:#e0ecff;color:#1e3a8a}
 .stripe.noprot{background:#000;color:#fff}
 .stripe.erro{background:#fee2e2;color:#991b1b;font-size:11px;border:2px solid #991b1b}
 .stripe.aviso{background:#fffbeb;color:#92400e;border:1px dashed #92400e}
-.origem{font-weight:normal;font-size:7px;color:#5b6b7f}
-table.d-itens{width:100%;border-collapse:collapse;margin-top:0;font-size:8.5px}
+table.d-itens{width:100%;border-collapse:collapse;margin-top:0;font-size:8px;table-layout:fixed}
 table.d-itens th{background:#eef2f7;border:1px solid #000;font-size:8px;padding:3px;text-transform:uppercase}
 table.d-itens td{border:1px solid #000;padding:3px;vertical-align:top}
-tr.reforma td{background:#f2fbf6;font-size:8px}
-.tag{display:inline-block;background:#0e7a4f;color:#fff;border-radius:4px;padding:0 4px;font-size:7.5px;font-weight:bold;margin-right:3px}
+table.d-itens td.num{text-align:right;white-space:nowrap}
+table.d-itens th:nth-child(1){width:9%}
+table.d-itens th:nth-child(2){width:31%}
+table.d-itens th:nth-child(3){width:11%}
+table.d-itens th:nth-child(4){width:6%}
+table.d-itens th:nth-child(5){width:8%}
+table.d-itens th:nth-child(6){width:7%}
+table.d-itens th:nth-child(7){width:9%}
+table.d-itens th:nth-child(8){width:9%}
+table.d-itens th:nth-child(9){width:10%}
+tr.item td{background:#fff}
+tr.trib td{background:#f7fafd;font-size:8px;padding:2px 4px}
+.trib-h{font-size:8px;font-weight:bold;text-transform:uppercase;color:#0f2a44;border-bottom:1px solid #cbd5e1;margin-bottom:2px}
+.trib-l{display:inline-flex;gap:3px;margin-right:8px;white-space:nowrap}
+.trib-l span{color:#5d6e80}
+.cclass{margin-top:2px;font-size:8px;color:#0e7a4f}
+.infadprod{font-size:8px;font-style:italic;color:#3c4c60}
+.sem-rtc{font-size:8px;color:#5b6b7f}
+.tag{display:inline-block;background:#0e7a4f;color:#fff;border-radius:4px;padding:0 4px;font-size:8px;font-weight:bold;margin-right:3px}
 .tag.is{background:#7c3aed}.tag.crt{background:#8a6d00}
+.d-qr .qr{display:block;margin:2px auto 0}
+.sem-qr{font-size:8px;color:#5b6b7f;line-height:1.2}
 .d-tot-reforma{display:flex;border:1px solid #000;border-top:0}
 .d-tot-reforma div{flex:1;border-left:1px solid #000;padding:4px;text-align:center}
 .d-tot-reforma div:first-child{border-left:0}
 .d-tot-reforma .v{font-size:13px;font-weight:900}
-.d-foot{font-size:7.5px;color:#333;margin-top:6px;display:flex;justify-content:space-between;border-top:1px solid #000;padding-top:4px}
+.d-foot{font-size:8px;color:#333;margin-top:6px;display:flex;justify-content:space-between;border-top:1px solid #000;padding-top:4px}
 /* Sem isso o navegador corta os fundos ao imprimir e as seções saem claras */
-.d-sec,.stripe,.tag,tr.reforma td{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.d-sec,.stripe,.tag,tr.trib td,.trib-h{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 
 @media(max-width:900px){.hero-grid,.grid3,.grid2{grid-template-columns:1fr}.corp-nav a{display:none}.footer-grid{grid-template-columns:1fr}}
 @media(max-width:620px){.corp-nav a:not(.btn-top){display:none}}
+/* Ajuste SINIEF 07/05: DANFE em A4 retrato, fonte mínima de 6pt (8px a 96 dpi). */
+@page{size:A4 portrait;margin:8mm}
 @media print{
   body{background:#fff}
   .corp-bar,.corp-hero,.panel#layout,.panel#base-legal,.panel#faq,.footer,.dropzone,.fine,.lote-bar,.lote-list,.doc-nav,.empty,.no-print{display:none!important}
