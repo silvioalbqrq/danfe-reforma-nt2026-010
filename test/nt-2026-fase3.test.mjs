@@ -230,6 +230,14 @@ test('NT 2026.007 RV N01-10: sem IE é proibido informar ICMS no item', () => {
     `alerta esperado; alertas: ${JSON.stringify(doc.alertas)}`);
 });
 
+test('NT 2026.007 RV N01-10: nota de crédito tpNFCredito=03 é exceção à vedação do ICMS', () => {
+  const ide = ideCom('').replace('<finNFe>1</finNFe>', '<finNFe>5</finNFe><tpNFCredito>03</tpNFCredito>');
+  const doc = parseXML(nfe({ imposto: IMPOSTO_RTC, emit: EMIT_SEM_IE, ide }), 'n0110exc.xml');
+
+  assert.equal(erro(doc, /N01-10|ICMS.*contribuinte exclusivo/i).length, 0,
+    `ICMS é permitido no retorno por recusa total; alertas: ${JSON.stringify(doc.alertas)}`);
+});
+
 test('NT 2026.007 RV UB12-11: sem IE o grupo IBS/CBS é obrigatório no item', () => {
   const doc = parseXML(nfe({ imposto: IMPOSTO_ICMS, emit: EMIT_SEM_IE }), 'ub1211.xml');
 

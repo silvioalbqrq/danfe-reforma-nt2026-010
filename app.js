@@ -443,13 +443,15 @@ function parseNFe(xml, name) {
 
   // --- NT 2026.007: emitente contribuinte exclusivo do IBS/CBS (sem IE) ---
   const semIE = !tx(emit, 'IE');
+  // N01-10 abre duas exceções: devolução (finNFe=4) e retorno por recusa total (finNFe=5, tpNFCredito=03).
+  const retornoRecusa = finNFe === '5' && tx(ide, 'tpNFCredito') === '03';
   if (semIE) {
     if (mod === '65') alertas.push({ nivel: 'erro', campo: 'IE', texto: 'NFC-e não pode ser emitida por contribuinte exclusivo do IBS/CBS (sem IE) — RV C17-42.' });
     if (!tx(emit, 'CNPJ')) alertas.push({ nivel: 'erro', campo: 'IE', texto: 'Obrigatório informar CNPJ do emitente para contribuinte exclusivo do IBS/CBS — RV C17-43.' });
     if (tx(emit, 'IEST')) alertas.push({ nivel: 'erro', campo: 'IE', texto: 'Proibido informar IEST para contribuinte exclusivo do IBS/CBS — RV C18-50.' });
     for (const it of itens) {
-      // N01-10 não se aplica à devolução (finNFe=4).
-      if (finNFe !== '4' && (it.temICMS || it.temICMSUFDest)) {
+      // N01-10 não se aplica à devolução (finNFe=4) nem ao retorno por recusa total (tpNFCredito=03).
+      if (finNFe !== '4' && !retornoRecusa && (it.temICMS || it.temICMSUFDest)) {
         alertas.push({ nivel: 'erro', campo: 'ICMS', texto: `Item ${it.nItem}: Proibido informar ICMS para contribuinte exclusivo do IBS/CBS — RV N01-10.` });
       }
       if (!it.temIbsCbs) {

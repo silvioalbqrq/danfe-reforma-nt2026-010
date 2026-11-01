@@ -39,17 +39,18 @@ Vigência: o IBS/CBS tem valor jurídico desde **01/01/2026** e o preenchimento 
 - Campos condicionais (vFCP, vFCPST, vICMSUFDest, vFCPUFDest, qBCMono, vICMSMono, qBCMonoReten, vICMSMonoReten, vUnComLiq, vProdLiq, vProdLiqTot, ICMSPrevistoPagtoAntecip) só aparecem quando o XML os traz.
 - **`gTribSN`** (NT 2026.005) é lido no item — dentro de `IBSCBS`, aceitando também a posição dentro de `gIBSCBS` — e nos totais em `IBSCBSTot/gTribSN`. Item com `gTribSN` exige o total (W59h-10) e total sem item é indevido (W59h-20); `vIBSSN`/`vCBSSN` do total são conferidos contra a soma dos itens (W59i-10/W59j-10).
 - **`ICMSPrevistoPagtoAntecip`** (NT 2026.008) é lido no grupo `ICMS` do item (N01), não em `ICMSTot`: NB01-10 veda em NFC-e, NB01-20 exige `tpNFDebito=06` ou `tpOperGov=4` e NB01-30 avisa a ausência a partir de 01/02/2027.
-- **Emitente sem IE** (NT 2026.007) é identificado como contribuinte exclusivo do IBS/CBS; o ICMS do item é vedado, exceto em devolução (`finNFe=4`), e o grupo IBS/CBS é obrigatório em cada item.
+- **Emitente sem IE** (NT 2026.007) é identificado como contribuinte exclusivo do IBS/CBS; o ICMS do item é vedado, exceto em devolução (`finNFe=4`) ou retorno por recusa total (`finNFe=5` com `tpNFCredito=03`), e o grupo IBS/CBS é obrigatório em cada item.
 - **Simples Nacional** (NT 2026.005): `tpRegimeIBSCBS` é impresso com descrição, `cAtivSN` aparece junto ao item e o MEI (CRT 4) é avisado quando informa o grupo IBSCBS.
 - CNPJ/CPF e chave aceitam o formato numérico e o alfanumérico (NT 2026.004); o DV é módulo 11 sobre caracteres, com letras valendo `ASCII − 48`.
 - Grupos que a nota não traz não viram seção no DANFE: sem `gPgtoVinc` não há seção de split payment, sem `infPAA` não há linha de PAA. `tpEmis` diferente de 1 sempre ganha faixa de contingência.
 - **Limite conhecido do `cClassTrib`**: só a *forma* é validada (6 dígitos e prefixo igual ao CST). A tabela oficial de códigos é publicada no portal do DF-e (`dfe-portal.svrs.rs.gov.br`) e em JSON via CFF, não no PDF do IT 2025.002 — confirmar a existência do código exigiria baixar essa tabela, e o gerador é offline.
+- **Limites conhecidos da NT 2026.007**: a regra I08-191 depende da tabela de CFOP permitidos (coluna `indExcIBSCBS`) publicada no Portal Nacional e as regras 12C02-10/20, 12C21-20, 1P10-30/32 consultam a LCC-RFB/CCC. Nenhuma dessas bases acompanha o XML, então o gerador não as avalia; as regras verificáveis no próprio documento (C17-42/43, C18-50, N01-10, UB12-11) são conferidas.
 
 ## Testes
 ```
 node --test test/
 ```
-108 testes, sem dependências. Cobrem o leiaute real (`IBSCBS`/`IBSCBSTot`/`ISTot`), CNPJ alfanumérico, ausência de inferência, QR Code, `tpImp=6`, campos condicionais, o CSS de impressão, o grupo YC do split payment, o `infPAA`/PAA, a forma do `cClassTrib`/`cClassTribIS`, as modalidades de contingência do MOC 7 Anexo III, o Simples Nacional (`tpRegimeIBSCBS`/`cAtivSN`/`gTribSN`), a emissão sem IE (N01-10, UB12-11, C17-43, C18-50) e o valor líquido/ICMS previsto (I11c-20, W01a, NB01).
+109 testes, sem dependências. Cobrem o leiaute real (`IBSCBS`/`IBSCBSTot`/`ISTot`), CNPJ alfanumérico, ausência de inferência, QR Code, `tpImp=6`, campos condicionais, o CSS de impressão, o grupo YC do split payment, o `infPAA`/PAA, a forma do `cClassTrib`/`cClassTribIS`, as modalidades de contingência do MOC 7 Anexo III, o Simples Nacional (`tpRegimeIBSCBS`/`cAtivSN`/`gTribSN`), a emissão sem IE (N01-10, UB12-11, C17-43, C18-50) e o valor líquido/ICMS previsto (I11c-20, W01a, NB01).
 
 ## Terceiros
 - `vendor/jsbarcode.min.js` — código de barras CODE-128.
