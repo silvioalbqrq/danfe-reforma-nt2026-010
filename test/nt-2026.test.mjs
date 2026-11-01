@@ -282,3 +282,53 @@ test('informações complementares: metadado de hash sai, conteúdo entre pipes 
   const comPipe = renderDANFE(parseXML(nfe({ infAdic: '<infAdic><infCpl>LOTE |A| PEDIDO 123</infCpl></infAdic>' }), 'hash2.xml'));
   assert.match(comPipe, /LOTE \|A\| PEDIDO 123/);
 });
+
+// ---------------------------------------------------------------------------
+// Pony review — correções (review no estilo Ponytail)
+// ---------------------------------------------------------------------------
+
+test('Pony: sem <total> o "Cálculo do imposto" não imprime 0,00 inventado', () => {
+  const semTotal = `<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+<NFe><infNFe Id="NFe35261112345678000195550010000004561000004568">
+<ide><cUF>35</cUF><natOp>VENDA</natOp><mod>55</mod><serie>1</serie>
+<nNF>456</nNF><dhEmi>2026-11-20T10:00:00-03:00</dhEmi><tpNF>1</tpNF><tpAmb>1</tpAmb>
+<tpImp>1</tpImp><tpEmis>1</tpEmis><finNFe>1</finNFe></ide>
+<emit><CNPJ>12345678000195</CNPJ><xNome>EMPRESA EXEMPLO LTDA</xNome><IE>123456789</IE><CRT>3</CRT>
+<enderEmit><xLgr>RUA A</xLgr><nro>100</nro><xBairro>CENTRO</xBairro><xMun>SAO PAULO</xMun><UF>SP</UF><CEP>01001000</CEP></enderEmit></emit>
+<dest><CNPJ>98765432000110</CNPJ><xNome>CLIENTE EXEMPLO SA</xNome><IE>987654321</IE><enderDest><xLgr>AV B</xLgr><nro>200</nro><xBairro>CENTRO</xBairro><xMun>RIO DE JANEIRO</xMun><UF>RJ</UF><CEP>20010000</CEP></enderDest></dest>
+<det nItem="1"><prod><cProd>001</cProd><xProd>PRODUTO</xProd><NCM>84713000</NCM><CFOP>5102</CFOP><uCom>UN</uCom><qCom>2.0000</qCom><vUnCom>10.0000</vUnCom><vProd>20.00</vProd></prod>
+<imposto><ICMS><ICMS00><CST>00</CST><vBC>20.00</vBC><vICMS>3.60</vICMS></ICMS00></ICMS></imposto>
+</det>
+<transp><modFrete>9</modFrete></transp>
+<infAdic><infCpl>SEM TOTAL</infCpl></infAdic>
+</infNFe></NFe>
+<protNFe><infProt><nProt>135260000000001</nProt><dhRecbto>2026-11-20T10:01:00-03:00</dhRecbto></infProt></protNFe>
+</nfeProc>`;
+  const html = renderDANFE(parseXML(semTotal, 'semtotal.xml'));
+  for (const rotulo of ['BC ICMS', 'Valor ICMS', 'BC ICMS ST', 'Valor ICMS ST', 'V. produtos',
+    'Frete', 'Seguro', 'Desconto', 'Outras desp.', 'V. total trib. (Lei 12.741)', 'V. total da nota']) {
+    assert.ok(html.includes(rotulo), `falta o rótulo "${rotulo}"`);
+  }
+  // Cada célula do cálculo do imposto deve ficar "—", nunca "0,00", pois o XML não declara total.
+  assert.match(html, /V\. total da nota<\/span><div class="d-val">—<\/div>/);
+  assert.doesNotMatch(html, /V\. total da nota<\/span><div class="d-val">0,00<\/div>/);
+  assert.match(html, /BC ICMS<\/span><div class="d-val">—<\/div>/);
+  assert.doesNotMatch(html, /BC ICMS<\/span><div class="d-val">0,00<\/div>/);
+});
+
+test('Pony: NB01 antes de ICMS00 não apaga o ICMS do item (primeiroFilhoDe)', () => {
+  const imposto = `<imposto>
+    <ICMS>
+      <ICMSPrevistoPagtoAntecip><vICMSPrevisto>0.42</vICMSPrevisto></ICMSPrevistoPagtoAntecip>
+      <ICMS00><CST>00</CST><vBC>20.00</vBC><pICMS>18.00</pICMS><vICMS>3.60</vICMS></ICMS00>
+    </ICMS>
+  </imposto>`;
+  const doc = parseXML(nfe({ imposto }), 'nb-primeiro.xml');
+  const it = doc.itens[0];
+  assert.equal(it.CST, '00', 'CST do ICMS não pode sumir quando NB01 vem primeiro');
+  assert.equal(it.BC, 20, 'vBC do ICMS não pode sumir quando NB01 vem primeiro');
+  assert.equal(it.vICMS, 3.6, 'vICMS do ICMS não pode sumir quando NB01 vem primeiro');
+  assert.equal(it.vICMSPrevisto, 0.42, 'NB01 deve continuar lido mesmo não sendo o primeiro filho');
+  assert.match(renderDANFE(doc), /3,60/);
+});

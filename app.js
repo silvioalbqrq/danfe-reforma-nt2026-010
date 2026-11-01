@@ -23,6 +23,9 @@ const soAlfanum = s => String(s || '').toUpperCase().replace(/[^0-9A-Z]/g, '');
 const fmtBRL = v => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const num2 = v => (Number(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const num4 = v => (Number(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
+/* Campo ausente no XML vira "—"; nunca 0,00 inventado. Usado no "Cálculo do imposto",
+   onde o total pode não existir no XML. */
+const numOuTraco = v => (v === null || v === undefined) ? '—' : num2(v);
 function maskDoc(s) {
   const v = soAlfanum(s);
   if (v.length === 14) return v.replace(/^(.{2})(.{3})(.{3})(.{4})(.{2})$/, '$1.$2.$3/$4-$5');
@@ -235,7 +238,10 @@ function parseNFe(xml, name) {
     // O ICMS do item mora em <ICMS><ICMS00|ICMS10|…><vBC/><pICMS/><vICMS/>. Ler a base
     // direto de <imposto> pegava o <vBC> do grupo de IBS/CBS quando ele vinha antes.
     const icmsEl = filhoDe(imp, 'ICMS');
-    const grupoICMS = primeiroFilhoDe(icmsEl);
+    // NT 2026.008: o grupo NB01 (ICMSPrevistoPagtoAntecip) é filho de <ICMS>, irmão de
+    // ICMS00/ICMS10. Não pode ser confundido com o grupo que traz CST/vBC/vICMS, senão
+    // o item perde o ICMS quando o NB01 é colocado antes do ICMS00.
+    const grupoICMS = icmsEl ? grupoDe(icmsEl, ['ICMS00','ICMS10','ICMS20','ICMS30','ICMS40','ICMS41','ICMS50','ICMS51','ICMS60','ICMS70','ICMS90','ICMSPart','ICMSFonte']) : null;
     // NT 2026.008: o grupo NB01 é filho do grupo ICMS (N01), irmão de ICMS00/ICMS10.
     const nbPrev = filhoDe(icmsEl, 'ICMSPrevistoPagtoAntecip');
     const ipiEl = filhoDe(imp, 'IPI');
@@ -546,7 +552,7 @@ function parseNFe(xml, name) {
       qBCMonoReten: numOuNull(total, 'qBCMonoReten'), vICMSMonoReten: numOuNull(total, 'vICMSMonoReten'),
       // NT 2026.008: valores líquidos e ICMS previsto para pagamento antecipado.
       vProdLiqTot: numOuNull(total, 'vProdLiqTot'), ICMSPrevistoPagtoAntecip: numOuNull(total, 'ICMSPrevistoPagtoAntecip')
-    } : { vNF: 0 },
+    } : {},
     reforma, problemasChave, qr, urlChave,
     alertas,
     transp: transp ? (() => { const t = filhoDe(transp, 'transporta'); const peso = v => { const b = tx(v, 'pesoB'), l = tx(v, 'pesoL'); return (b || l) ? ` (${[b && `B ${b}`, l && `L ${l}`].filter(Boolean).join(' / ')} kg)` : ''; }; return { modFrete: tx(transp, 'modFrete'), tNome: tx(t, 'xNome'), tDoc: tx(t, 'CNPJ') || tx(t, 'CPF'), vols: filhosDe(transp).filter(v => v.nodeName === 'vol').map(v => ({ qVol: tx(v, 'qVol'), esp: tx(v, 'esp'), peso: peso(v) })) }; })() : null,
@@ -704,7 +710,7 @@ function renderDANFE(d) {
   const temMono = monoVals.some(v => v !== null && v !== undefined);
   // NT 2026.005: totais do IBS/CBS do Simples Nacional (gTribSN). Só aparecem se o
   // XML declarar o grupo; o valor não é estimado a partir dos itens.
-  const temSN = r.vIBSSN !== null && r.vIBSSN !== undefined || r.vCBSSN !== null && r.vCBSSN !== undefined;
+  const temSN = (r.vIBSSN !== null && r.vIBSSN !== undefined) || (r.vCBSSN !== null && r.vCBSSN !== undefined);
   const fmtTot = v => (v === null || v === undefined) ? '—' : fmtBRL(v);
   const blocoReforma = r.temNoXML
     ? `<div class="d-tot-reforma">
@@ -769,19 +775,19 @@ function renderDANFE(d) {
     <div class="d-row first"><div class="d-cell" style="flex:1"><div class="d-val norm">${d.pagamentos.map(p => `Pagamento ${esc(p.nPag || '—')} · transação ${esc(p.idTransacao || '—')} · meio ${esc(p.tpMeioPgto || '—')}${p.CNPJReceb ? ` · recebedor ${esc(maskDoc(p.CNPJReceb))}` : ''}${p.CNPJBasePSP ? ` · PSP base ${esc(p.CNPJBasePSP)}` : ''}`).join('<br>')}</div></div></div>` : ''}
     <div class="d-sec">Cálculo do imposto (valores do XML)</div>
     <div class="d-row first">
-      <div class="d-cell" style="flex:1"><span class="d-lab">BC ICMS</span><div class="d-val">${num2(d.tot.vBC)}</div></div>
-      <div class="d-cell" style="flex:1"><span class="d-lab">Valor ICMS</span><div class="d-val">${num2(d.tot.vICMS)}</div></div>
-      <div class="d-cell" style="flex:1"><span class="d-lab">BC ICMS ST</span><div class="d-val">${num2(d.tot.vBCST)}</div></div>
-      <div class="d-cell" style="flex:1"><span class="d-lab">Valor ICMS ST</span><div class="d-val">${num2(d.tot.vST)}</div></div>
-      <div class="d-cell" style="flex:1"><span class="d-lab">V. produtos</span><div class="d-val">${num2(d.tot.vProd)}</div></div>
+      <div class="d-cell" style="flex:1"><span class="d-lab">BC ICMS</span><div class="d-val">${numOuTraco(d.tot.vBC)}</div></div>
+      <div class="d-cell" style="flex:1"><span class="d-lab">Valor ICMS</span><div class="d-val">${numOuTraco(d.tot.vICMS)}</div></div>
+      <div class="d-cell" style="flex:1"><span class="d-lab">BC ICMS ST</span><div class="d-val">${numOuTraco(d.tot.vBCST)}</div></div>
+      <div class="d-cell" style="flex:1"><span class="d-lab">Valor ICMS ST</span><div class="d-val">${numOuTraco(d.tot.vST)}</div></div>
+      <div class="d-cell" style="flex:1"><span class="d-lab">V. produtos</span><div class="d-val">${numOuTraco(d.tot.vProd)}</div></div>
     </div>
     <div class="d-row">
-      <div class="d-cell" style="flex:1"><span class="d-lab">Frete</span><div class="d-val">${num2(d.tot.vFrete)}</div></div>
-      <div class="d-cell" style="flex:1"><span class="d-lab">Seguro</span><div class="d-val">${num2(d.tot.vSeg)}</div></div>
-      <div class="d-cell" style="flex:1"><span class="d-lab">Desconto</span><div class="d-val">${num2(d.tot.vDesc)}</div></div>
-      <div class="d-cell" style="flex:1"><span class="d-lab">Outras desp.</span><div class="d-val">${num2(d.tot.vOutro)}</div></div>
-      <div class="d-cell" style="flex:1"><span class="d-lab">V. total trib. (Lei 12.741)</span><div class="d-val">${num2(d.tot.vTotTrib)}</div></div>
-      <div class="d-cell" style="flex:1"><span class="d-lab">V. total da nota</span><div class="d-val">${num2(d.tot.vNF)}</div></div>
+      <div class="d-cell" style="flex:1"><span class="d-lab">Frete</span><div class="d-val">${numOuTraco(d.tot.vFrete)}</div></div>
+      <div class="d-cell" style="flex:1"><span class="d-lab">Seguro</span><div class="d-val">${numOuTraco(d.tot.vSeg)}</div></div>
+      <div class="d-cell" style="flex:1"><span class="d-lab">Desconto</span><div class="d-val">${numOuTraco(d.tot.vDesc)}</div></div>
+      <div class="d-cell" style="flex:1"><span class="d-lab">Outras desp.</span><div class="d-val">${numOuTraco(d.tot.vOutro)}</div></div>
+      <div class="d-cell" style="flex:1"><span class="d-lab">V. total trib. (Lei 12.741)</span><div class="d-val">${numOuTraco(d.tot.vTotTrib)}</div></div>
+      <div class="d-cell" style="flex:1"><span class="d-lab">V. total da nota</span><div class="d-val">${numOuTraco(d.tot.vNF)}</div></div>
     </div>
     ${(() => {
       // NT 2026.010 §4.4 + NT 2026.008: campos condicionais do ICMSTot. Só a célula
@@ -878,13 +884,20 @@ function montaResumo({ ok, dups, grandes, excesso, erros }) {
   return `Carregados: ${ok}.\n` + partes.join('\n');
 }
 /* Restaura título/DOM quando a impressão termina (afterprint), com rede de
-   segurança de 5 s. Sem window (testes), executa na hora. */
+   segurança de 5 s. Só há um ouvinte/um timer por vez: impressões seguidas não
+   empilham listeners nem restauram o título antes da hora. Sem window (testes),
+   executa na hora. */
+let impressaoPendente = null;
 function aposImpressao(fn) {
   if (typeof window === 'undefined' || !window.addEventListener) { fn(); return; }
+  if (impressaoPendente) {
+    clearTimeout(impressaoPendente.timer);
+    window.removeEventListener('afterprint', impressaoPendente.listener);
+  }
   let feito = false;
-  const umaVez = () => { if (feito) return; feito = true; window.removeEventListener('afterprint', umaVez); fn(); };
+  const umaVez = () => { if (feito) return; feito = true; window.removeEventListener('afterprint', umaVez); impressaoPendente = null; fn(); };
+  impressaoPendente = { listener: umaVez, timer: setTimeout(umaVez, 5000) };
   window.addEventListener('afterprint', umaVez);
-  setTimeout(umaVez, 5000);
 }
 /* Quantidade com vírgula decimal; texto não numérico passa cru. */
 function fmtQtd(q) {
@@ -922,6 +935,8 @@ function iniciar() {
 dropzone.addEventListener('click', e => { if (e.target.closest('button')) return; fileInput.click(); });
 $('#btnPick').onclick = e => { e.stopPropagation(); fileInput.click(); };
 $('#btnPickTop').onclick = () => fileInput.click();
+$('#btnSample').onclick = downloadSample;
+$('#btnSampleTop').onclick = downloadSample;
 $('#btnTopConvert').onclick = () => $('#conversor').scrollIntoView({ behavior: 'smooth' });
 fileInput.addEventListener('change', e => { handleFiles(e.target.files); fileInput.value = ''; });
 ['dragover', 'dragenter'].forEach(ev => dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.add('over'); }));
