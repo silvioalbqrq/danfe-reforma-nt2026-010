@@ -98,11 +98,23 @@ function reformaItem(imp) {
   const vBCIS = isEl ? num(isEl, 'vBCIS') : 0;
   const pIS = isEl ? num(isEl, 'pIS') : 0;
   const vIS = isEl ? num(isEl, 'vIS') : 0;
+  // NT 2026.005: composição do IBS/CBS do Simples Nacional (grupo UB115a). O leiaute
+  // o posiciona no grupo UB (IBSCBS); versões do schema também o aceitam dentro de
+  // gIBSCBS, então a leitura cobre as duas posições, sempre por filho direto.
+  const snEl = (gTrib ? filhoDe(gTrib, 'gTribSN') : null) || (ibsCBS ? filhoDe(ibsCBS, 'gTribSN') : null);
+  const gIBSSN = filhoDe(snEl, 'gIBSSN'), gCBSSN = filhoDe(snEl, 'gCBSSN');
+  const gTribSN = snEl ? {
+    pIBSSN: num(gIBSSN, 'pIBSSN'), vIBSSN: num(gIBSSN, 'vIBSSN'),
+    pCBSSN: num(gCBSSN, 'pCBSSN'), vCBSSN: num(gCBSSN, 'vCBSSN')
+  } : null;
   const temIbsCbs = !!ibsCBS;
   const temIS = !!isEl;
   return {
     temIbsCbs, temIS, cClassTrib, cst, vBC, pIBSUF, pIBSMun, pCBS, efetiva,
     vIBSUF, vIBSMun, vCBS, vIBSTot: vIBSUF + vIBSMun, cstIS, cClassTribIS, vBCIS, pIS, vIS,
+    gTribSN, temGTribSN: !!snEl,
+    // NT 2026.007: o ICMS do item precisa ser detectado para a vedação N01-10.
+    temICMS: !!filhoDe(imp, 'ICMS'), temICMSUFDest: !!filhoDe(imp, 'ICMSUFDest'),
     has: temIbsCbs || temIS
   };
 }
@@ -224,6 +236,8 @@ function parseNFe(xml, name) {
     // direto de <imposto> pegava o <vBC> do grupo de IBS/CBS quando ele vinha antes.
     const icmsEl = filhoDe(imp, 'ICMS');
     const grupoICMS = primeiroFilhoDe(icmsEl);
+    // NT 2026.008: o grupo NB01 é filho do grupo ICMS (N01), irmão de ICMS00/ICMS10.
+    const nbPrev = filhoDe(icmsEl, 'ICMSPrevistoPagtoAntecip');
     const ipiEl = filhoDe(imp, 'IPI');
     const ref = reformaItem(imp || det);
     return {
@@ -231,9 +245,12 @@ function parseNFe(xml, name) {
       cProd: tx(prod, 'cProd'), xProd: tx(prod, 'xProd'), infAdProd: tx(det, 'infAdProd'),
       NCM: tx(prod, 'NCM'), CFOP: tx(prod, 'CFOP'), uCom: tx(prod, 'uCom'), qCom: tx(prod, 'qCom'),
       vUnCom: num(prod, 'vUnCom'), vProd: num(prod, 'vProd'),
+      // NT 2026.005: código de atividade do Simples Nacional (I17d).
+      cAtivSN: tx(prod, 'cAtivSN'),
       // NT 2026.008: valores líquidos do item (002/003/004), usados quando a operação
       // tem redução/desconto próprio. Ficam nulos quando o XML não os traz.
       vUnComLiq: numOuNull(prod, 'vUnComLiq'), vProdLiq: numOuNull(prod, 'vProdLiq'),
+      vICMSPrevisto: numOuNull(nbPrev, 'vICMSPrevisto'), temNBPrev: !!nbPrev,
       CST: grupoICMS ? (str(grupoICMS, 'CST') || str(grupoICMS, 'CSOSN')) : '',
       BC: grupoICMS ? num(grupoICMS, 'vBC') : 0,
       BCST: grupoICMS ? num(grupoICMS, 'vBCST') : 0,
@@ -251,6 +268,8 @@ function parseNFe(xml, name) {
   const ibsCbsTot = filhoDe(grupoTotal, 'IBSCBSTot');
   const isTot = filhoDe(grupoTotal, 'ISTot');
   const gIBS = filhoDe(ibsCbsTot, 'gIBS'), gCBS = filhoDe(ibsCbsTot, 'gCBS'), gMono = filhoDe(ibsCbsTot, 'gMono');
+  // NT 2026.005: totais do IBS/CBS do Simples Nacional (W59h), filho de IBSCBSTot.
+  const gTribSNTot = filhoDe(ibsCbsTot, 'gTribSN');
   const gIBSUF = filhoDe(gIBS, 'gIBSUF'), gIBSMun = filhoDe(gIBS, 'gIBSMun');
   const campoTotal = (escopos, ...tags) => {
     for (const s of escopos) { if (!s) continue; const v = numOuNull(s, ...tags); if (v !== null) return v; }
@@ -265,14 +284,18 @@ function parseNFe(xml, name) {
     vIBSMono: campoTotal([gMono], 'vIBSMono'),
     vCBSMono: campoTotal([gMono], 'vCBSMono'),
     vIBSMonoReten: campoTotal([gMono], 'vIBSMonoReten'),
-    vCBSMonoReten: campoTotal([gMono], 'vCBSMonoReten')
+    vCBSMonoReten: campoTotal([gMono], 'vCBSMonoReten'),
+    vIBSSN: campoTotal([gTribSNTot], 'vIBSSN'),
+    vCBSSN: campoTotal([gTribSNTot], 'vCBSSN')
   };
   const soma = {
     vIBS: itens.reduce((a, i) => a + i.vIBSTot, 0),
     vIBSUF: itens.reduce((a, i) => a + i.vIBSUF, 0),
     vIBSMun: itens.reduce((a, i) => a + i.vIBSMun, 0),
     vCBS: itens.reduce((a, i) => a + i.vCBS, 0),
-    vIS: itens.reduce((a, i) => a + i.vIS, 0)
+    vIS: itens.reduce((a, i) => a + i.vIS, 0),
+    vIBSSN: itens.reduce((a, i) => a + (i.gTribSN ? i.gTribSN.vIBSSN : 0), 0),
+    vCBSSN: itens.reduce((a, i) => a + (i.gTribSN ? i.gTribSN.vCBSSN : 0), 0)
   };
   const ROTULOS = { vIBS: 'IBS', vIBSUF: 'IBS UF', vIBSMun: 'IBS Município', vCBS: 'CBS', vIS: 'IS' };
   const origem = {};
@@ -314,6 +337,9 @@ function parseNFe(xml, name) {
     vCBSMono: declarado.vCBSMono,
     vIBSMonoReten: declarado.vIBSMonoReten,
     vCBSMonoReten: declarado.vCBSMonoReten,
+    // NT 2026.005: totais do Simples Nacional; null = o XML não declara o grupo.
+    vIBSSN: declarado.vIBSSN,
+    vCBSSN: declarado.vCBSSN,
     origem,
     temNoXML: !!(ibsCbsTot || isTot || itens.some(i => i.has))
   };
@@ -352,6 +378,83 @@ function parseNFe(xml, name) {
     }
     if (it.temIS && it.cClassTribIS && !/^\d{6}$/.test(it.cClassTribIS)) {
       alertas.push({ nivel: 'erro', campo: 'cClassTribIS', texto: `Item ${it.nItem}: cClassTribIS "${it.cClassTribIS}" não tem 6 dígitos numéricos (UB03, IT 2025.002 v1.70).` });
+    }
+  }
+
+  // --- NT 2026.008: valor líquido do produto e ICMS previsto no pagamento antecipado ---
+  // I11c-20: em NF-e normal (finNFe=1), vProdLiq é vUnComLiq × qCom (tolerância 0,01).
+  const finNFe = tx(ide, 'finNFe', '1');
+  const mod = String(tx(ide, 'mod', '55'));
+  for (const it of itens) {
+    if (it.vProdLiq !== null && finNFe === '1' && it.vUnComLiq !== null) {
+      const q = parseFloat(String(it.qCom).replace(',', '.'));
+      const esperado = it.vUnComLiq * (isNaN(q) ? 0 : q);
+      if (Math.abs(it.vProdLiq - esperado) > 0.01) {
+        alertas.push({ nivel: 'erro', campo: 'vProdLiq', texto: `Item ${it.nItem}: Valor Líquido do Produto difere de vUnComLiq × qCom: o XML declara ${num2(it.vProdLiq)} e o cálculo dá ${num2(esperado)} — RV I11c-20.` });
+      }
+    }
+  }
+  // W01a: o total líquido acompanha os itens — nem ausente, nem divergente.
+  const vProdLiqTot = total ? numOuNull(total, 'vProdLiqTot') : null;
+  const somaProdLiq = itens.reduce((a, i) => a + (i.vProdLiq || 0), 0);
+  if (itens.some(i => i.vProdLiq !== null) && vProdLiqTot === null) {
+    alertas.push({ nivel: 'erro', campo: 'vProdLiqTot', texto: 'Total Líquido não informado: há vProdLiq nos itens, mas o grupo de totais não traz vProdLiqTot — RV W01a-10.' });
+  }
+  if (vProdLiqTot !== null && Math.abs(vProdLiqTot - somaProdLiq) > 0.01) {
+    alertas.push({ nivel: 'erro', campo: 'vProdLiqTot', texto: `Total Líquido difere do somatório dos itens: o XML declara ${num2(vProdLiqTot)} e os itens somam ${num2(somaProdLiq)} — RV W01a-20.` });
+  }
+  // NB01: o grupo vive no ICMS do item e só cabe em pagamento antecipado.
+  const tpNFDebito = tx(ide, 'tpNFDebito'), tpOperGov = tx(ide, 'tpOperGov');
+  const antecipado = tpNFDebito === '06' || tpOperGov === '4';
+  for (const it of itens) {
+    if (it.temNBPrev) {
+      if (mod === '65') {
+        alertas.push({ nivel: 'erro', campo: 'ICMSPrevistoPagtoAntecip', texto: `Item ${it.nItem}: Grupo do ICMS Previsto no Pagamento Antecipado informado indevidamente em NFC-e (modelo 65) — RV NB01-10.` });
+      } else if (!antecipado) {
+        alertas.push({ nivel: 'erro', campo: 'ICMSPrevistoPagtoAntecip', texto: `Item ${it.nItem}: Grupo do ICMS Previsto no Pagamento Antecipado informado indevidamente — só cabe com tpNFDebito=06 (pagamento antecipado) ou tpOperGov=4 — RV NB01-20.` });
+      }
+    } else if (antecipado && mod !== '65') {
+      alertas.push({ nivel: 'aviso', campo: 'ICMSPrevistoPagtoAntecip', texto: `Item ${it.nItem}: ICMS Previsto no Pagamento Antecipado não informado, embora a operação seja de pagamento antecipado — RV NB01-30 (exigência em homologação a partir de 01/02/2027).` });
+    }
+  }
+
+  // --- NT 2026.005: Simples Nacional (cAtivSN, gTribSN e MEI) ---
+  const crtEmit = String(tx(emit, 'CRT'));
+  const tpRegimeIBSCBS = String(tx(emit, 'tpRegimeIBSCBS'));
+  const temGTribSNItem = itens.some(i => i.temGTribSN);
+  if (temGTribSNItem && !gTribSNTot) {
+    alertas.push({ nivel: 'erro', campo: 'gTribSN', texto: 'Grupo de totais do IBS e da CBS para o Simples Nacional não informado (total/IBSCBSTot/gTribSN), embora haja gTribSN em item — RV W59h-10.' });
+  }
+  if (gTribSNTot && !temGTribSNItem) {
+    alertas.push({ nivel: 'erro', campo: 'gTribSN', texto: 'Grupo de totais do IBS e da CBS para o Simples Nacional informado indevidamente: nenhum item traz gTribSN — RV W59h-20.' });
+  }
+  if (gTribSNTot && declarado.vIBSSN !== null && Math.abs(declarado.vIBSSN - soma.vIBSSN) > 0.01) {
+    alertas.push({ nivel: 'erro', campo: 'vIBSSN', texto: `Total do IBS para o Simples Nacional difere da soma dos itens: o XML declara ${num2(declarado.vIBSSN)} e os itens somam ${num2(soma.vIBSSN)} — RV W59i-10.` });
+  }
+  if (gTribSNTot && declarado.vCBSSN !== null && Math.abs(declarado.vCBSSN - soma.vCBSSN) > 0.01) {
+    alertas.push({ nivel: 'erro', campo: 'vCBSSN', texto: `Total da CBS para o Simples Nacional difere da soma dos itens: o XML declara ${num2(declarado.vCBSSN)} e os itens somam ${num2(soma.vCBSSN)} — RV W59j-10.` });
+  }
+  if (crtEmit === '4' && itens.some(i => i.temIbsCbs)) {
+    alertas.push({ nivel: 'aviso', campo: 'IBSCBS', texto: 'MEI (CRT 4) não deve informar o grupo IBSCBS — NT 2026.005 §2.3.' });
+  }
+  if ((crtEmit === '1' || crtEmit === '2' || ['2', '3', '4'].includes(tpRegimeIBSCBS)) && itens.some(i => !i.cAtivSN)) {
+    alertas.push({ nivel: 'aviso', campo: 'cAtivSN', texto: 'Contribuinte do Simples Nacional (ou com opção pendente) deve informar cAtivSN em cada item — NT 2026.005 §2.2.' });
+  }
+
+  // --- NT 2026.007: emitente contribuinte exclusivo do IBS/CBS (sem IE) ---
+  const semIE = !tx(emit, 'IE');
+  if (semIE) {
+    if (mod === '65') alertas.push({ nivel: 'erro', campo: 'IE', texto: 'NFC-e não pode ser emitida por contribuinte exclusivo do IBS/CBS (sem IE) — RV C17-42.' });
+    if (!tx(emit, 'CNPJ')) alertas.push({ nivel: 'erro', campo: 'IE', texto: 'Obrigatório informar CNPJ do emitente para contribuinte exclusivo do IBS/CBS — RV C17-43.' });
+    if (tx(emit, 'IEST')) alertas.push({ nivel: 'erro', campo: 'IE', texto: 'Proibido informar IEST para contribuinte exclusivo do IBS/CBS — RV C18-50.' });
+    for (const it of itens) {
+      // N01-10 não se aplica à devolução (finNFe=4).
+      if (finNFe !== '4' && (it.temICMS || it.temICMSUFDest)) {
+        alertas.push({ nivel: 'erro', campo: 'ICMS', texto: `Item ${it.nItem}: Proibido informar ICMS para contribuinte exclusivo do IBS/CBS — RV N01-10.` });
+      }
+      if (!it.temIbsCbs) {
+        alertas.push({ nivel: 'erro', campo: 'IBSCBS', texto: `Item ${it.nItem}: Grupo IBS/CBS obrigatório para contribuinte exclusivo do IBS/CBS — RV UB12-11.` });
+      }
     }
   }
 
@@ -429,7 +532,7 @@ function parseNFe(xml, name) {
     xJust: xJustIde, dhCont: dhContIde,
     // NT 2026.006 e NT 2026.001: grupos que ficam como filho direto de <infNFe>.
     pagamentos, temPgtoVinc: !!gPgtoVinc, paa,
-    emit: { nome: tx(emit, 'xNome'), doc: tx(emit, 'CNPJ') || tx(emit, 'CPF'), IE: tx(emit, 'IE'), IEST: tx(emit, 'IEST'), IM: tx(emit, 'IM'), CRT: tx(emit, 'CRT'), ender: eo },
+    emit: { nome: tx(emit, 'xNome'), doc: tx(emit, 'CNPJ') || tx(emit, 'CPF'), IE: tx(emit, 'IE'), IEST: tx(emit, 'IEST'), IM: tx(emit, 'IM'), CRT: tx(emit, 'CRT'), tpRegimeIBSCBS: tx(emit, 'tpRegimeIBSCBS'), ender: eo },
     dest: { nome: tx(dest, 'xNome') || '—', doc: tx(dest, 'CNPJ') || tx(dest, 'CPF'), IE: tx(dest, 'IE'), ender: doo },
     fat: fat ? { vLiq: num(fat, 'vLiq') } : null, dups,
     tot: total ? { vBC: num(total, 'vBC'), vICMS: num(total, 'vICMS'), vBCST: num(total, 'vBCST'), vST: num(total, 'vST'), vProd: num(total, 'vProd'), vFrete: num(total, 'vFrete'), vSeg: num(total, 'vSeg'), vDesc: num(total, 'vDesc'), vII: num(total, 'vII'), vIPI: num(total, 'vIPI'), vPIS: num(total, 'vPIS'), vCOFINS: num(total, 'vCOFINS'), vOutro: num(total, 'vOutro'), vNF: num(total, 'vNF'), vTotTrib: num(total, 'vTotTrib'),
@@ -496,10 +599,20 @@ function qrSVG(texto, largura = 74) {
 /* CRT com a descrição do código, como o modelo do DANFE exige — não só o número. */
 const CRT_DESC = { '1': '1 - Simples Nacional', '2': '2 - Simples Nacional, excesso de sublimite', '3': '3 - Regime Normal', '4': '4 - MEI' };
 const crtTexto = c => CRT_DESC[String(c || '').trim()] || (c ? `${c} - não informado` : '—');
+/* NT 2026.005: tpRegimeIBSCBS (C21a) com a descrição do código. */
+const TP_REGIME_DESC = {
+  '1': '1 - Simples Nacional com opção pelo regime regular do IBS/CBS',
+  '2': '2 - Regime Normal com opção pendente pelo Simples Nacional, sem regime regular do IBS/CBS',
+  '3': '3 - Regime Normal com opção pendente pelo Simples Nacional (excesso de sublimite), sem regime regular do IBS/CBS',
+  '4': '4 - Regime Normal com opção pendente pelo Simples Nacional, com regime regular do IBS/CBS'
+};
+const tpRegimeTexto = c => TP_REGIME_DESC[String(c || '').trim()] || (c ? `${c} - não informado` : '—');
 const FRETE = { '0': '0-Remetente', '1': '1-Destinatário', '2': '2-Terceiros', '9': '9-Sem frete' };
 /* Nome + documento do transportador sem o "— —" quando o XML não traz transportadora. */
 function transpId(t) {
-  const nome = (t && t.tNome) || '', doc = onlyD(t && t.tDoc);
+  // NT 2026.004: o CNPJ do transportador também pode ser alfanumérico — `onlyD`
+  // apagava as letras e imprimia um número que não existe no XML.
+  const nome = (t && t.tNome) || '', doc = soAlfanum(t && t.tDoc);
   if (nome && doc) return `${nome} ${maskDoc(doc)}`;
   return nome || (doc ? maskDoc(doc) : '—');
 }
@@ -554,18 +667,23 @@ function renderDANFE(d) {
       it.temIbsCbs ? `cClassTrib <b>${esc(it.cClassTrib || '—')}</b> · CST IBS/CBS <b>${esc(it.cst || '—')}</b>` : '',
       it.temIS ? `CST IS <b>${esc(it.cstIS || '—')}</b>` : '',
       it.temIS && it.cClassTribIS ? `cClassTribIS <b>${esc(it.cClassTribIS)}</b>` : '',
+      it.cAtivSN ? `Atividade SN ${esc(it.cAtivSN)}` : '',
       it.efetiva ? '<span class="tag">alíquota efetiva</span>' : ''
     ].filter(Boolean).join(' · ');
+    // NT 2026.008: valores líquidos do produto, quando o XML os declara.
+    const valoresLiq = (it.vUnComLiq !== null || it.vProdLiq !== null)
+      ? `<div class="cclass">${it.vUnComLiq !== null ? `V. unit. líquido <b>${num4(it.vUnComLiq)}</b>` : ''}${it.vUnComLiq !== null && it.vProdLiq !== null ? ' · ' : ''}${it.vProdLiq !== null ? `V. líquido <b>${num2(it.vProdLiq)}</b>` : ''}</div>`
+      : '';
     return `<tr class="item">
       <td>${esc(String(it.cProd || '—').slice(0, 18))}</td>
-      <td><b>${esc(it.xProd)}</b>${it.infAdProd ? `<div class="infadprod">${esc(it.infAdProd)}</div>` : ''}${idReforma ? `<div class="cclass">${idReforma}</div>` : ''}</td>
+      <td><b>${esc(it.xProd)}</b>${it.infAdProd ? `<div class="infadprod">${esc(it.infAdProd)}</div>` : ''}${idReforma ? `<div class="cclass">${idReforma}</div>` : ''}${valoresLiq}</td>
       <td>${esc(it.NCM)}</td><td>${esc(it.CST)}</td><td>${esc(it.CFOP)}</td><td>${esc(it.uCom)}</td>
       ${cel(esc(fmtQtd(it.qCom)))}${cel(num4(it.vUnCom))}${cel(num2(it.vProd))}
     </tr>
     <tr class="trib">
       <td colspan="3"><div class="trib-h">Bases de cálculo</div>${par('BC ICMS', num2(it.BC))}${it.BCST ? par('BC ICMS ST', num2(it.BCST)) : ''}${it.temIbsCbs ? par('BC IBS/CBS', num2(it.vBC)) : ''}${it.temIS ? par('BC IS', num2(it.vBCIS)) : ''}${!it.temIbsCbs && !it.temIS ? '<span class="sem-rtc">Sem grupos da Reforma neste item.</span>' : ''}</td>
-      <td colspan="3"><div class="trib-h">Alíquotas</div>${par('ICMS', it.aliqICMS ? num2(it.aliqICMS) + '%' : '—')}${it.temIbsCbs ? par('IBS UF', num2(it.pIBSUF) + '%') + par('IBS Mun', num2(it.pIBSMun) + '%') + par('CBS', num2(it.pCBS) + '%') : ''}${it.temIS ? par('IS', num2(it.pIS) + '%') : ''}</td>
-      <td colspan="3"><div class="trib-h">Valor dos tributos</div>${par('ICMS', num2(it.vICMS))}${par('IPI', num2(it.vIPI))}${it.temIbsCbs ? par('IBS UF', num2(it.vIBSUF)) + par('IBS Mun', num2(it.vIBSMun)) + par('CBS', num2(it.vCBS)) : ''}${it.temIS ? par('IS', num2(it.vIS)) : ''}</td>
+      <td colspan="3"><div class="trib-h">Alíquotas</div>${par('ICMS', it.aliqICMS ? num2(it.aliqICMS) + '%' : '—')}${it.temIbsCbs ? par('IBS UF', num2(it.pIBSUF) + '%') + par('IBS Mun', num2(it.pIBSMun) + '%') + par('CBS', num2(it.pCBS) + '%') : ''}${it.temIS ? par('IS', num2(it.pIS) + '%') : ''}${it.gTribSN ? par('IBS Simples', num2(it.gTribSN.pIBSSN) + '%') + par('CBS Simples', num2(it.gTribSN.pCBSSN) + '%') : ''}</td>
+      <td colspan="3"><div class="trib-h">Valor dos tributos</div>${par('ICMS', num2(it.vICMS))}${par('IPI', num2(it.vIPI))}${it.temIbsCbs ? par('IBS UF', num2(it.vIBSUF)) + par('IBS Mun', num2(it.vIBSMun)) + par('CBS', num2(it.vCBS)) : ''}${it.temIS ? par('IS', num2(it.vIS)) : ''}${it.gTribSN ? par('IBS Simples', num2(it.gTribSN.vIBSSN)) + par('CBS Simples', num2(it.gTribSN.vCBSSN)) : ''}${it.vICMSPrevisto !== null ? `<span class="trib-l"><b>ICMS previsto p/ pagto antecipado ${num2(it.vICMSPrevisto)}</b></span>` : ''}</td>
     </tr>`;
   }).join('');
 
@@ -582,6 +700,9 @@ function renderDANFE(d) {
   // monofásicos. Campo que o XML não declara sai como "—": o gerador não estima.
   const monoVals = [r.vIBSMono, r.vCBSMono, r.vIBSMonoReten, r.vCBSMonoReten];
   const temMono = monoVals.some(v => v !== null && v !== undefined);
+  // NT 2026.005: totais do IBS/CBS do Simples Nacional (gTribSN). Só aparecem se o
+  // XML declarar o grupo; o valor não é estimado a partir dos itens.
+  const temSN = r.vIBSSN !== null && r.vIBSSN !== undefined || r.vCBSSN !== null && r.vCBSSN !== undefined;
   const fmtTot = v => (v === null || v === undefined) ? '—' : fmtBRL(v);
   const blocoReforma = r.temNoXML
     ? `<div class="d-tot-reforma">
@@ -590,6 +711,10 @@ function renderDANFE(d) {
         <div><span class="d-lab">Total CBS</span><div class="v">${fmtTot(r.vCBS)}</div></div>
         <div><span class="d-lab">Total Imposto Seletivo (IS)</span><div class="v">${fmtTot(r.vIS)}</div></div>
       </div>` +
+      (temSN ? `<div class="d-tot-reforma">
+        <div><span class="d-lab">Total IBS Simples Nacional</span><div class="v">${fmtTot(r.vIBSSN)}</div></div>
+        <div><span class="d-lab">Total CBS Simples Nacional</span><div class="v">${fmtTot(r.vCBSSN)}</div></div>
+      </div>` : '') +
       (temMono ? `<div class="d-tot-reforma">
         <div><span class="d-lab">IBS Monofásico</span><div class="v">${fmtTot(r.vIBSMono)}</div></div>
         <div><span class="d-lab">CBS Monofásica</span><div class="v">${fmtTot(r.vCBSMono)}</div></div>
@@ -611,10 +736,10 @@ function renderDANFE(d) {
       <div class="d-cell" style="flex:1"><span class="d-lab">Protocolo de autorização de uso</span><div class="d-val">${d.prot ? esc(d.prot.nProt) + ' · ' + esc(fmtData(d.prot.dh)) + ' ' + esc(fmtHora(d.prot.dh)) : 'SEM PROTOCOLO'}</div></div>
     </div>
     <div class="d-row">
-      <div class="d-cell" style="width:22%"><span class="d-lab">Inscrição estadual</span><div class="d-val">${esc(d.emit.IE || '—')}${d.emit.IE ? '' : ' <span class="tag">SEM IE</span>'}</div></div>
+      <div class="d-cell" style="width:22%"><span class="d-lab">Inscrição estadual</span><div class="d-val">${esc(d.emit.IE || '—')}${d.emit.IE ? '' : ' <span class="tag">SEM IE · Contribuinte exclusivo do IBS/CBS</span>'}</div></div>
       <div class="d-cell" style="width:20%"><span class="d-lab">Inscr. estadual subst. trib.</span><div class="d-val">${esc(d.emit.IEST || '—')}</div></div>
       <div class="d-cell" style="width:30%"><span class="d-lab">CNPJ / CPF + CRT</span><div class="d-val">${esc(maskDoc(d.emit.doc))} <span class="tag crt">${esc(crtTexto(d.emit.CRT))}</span></div></div>
-      <div class="d-cell" style="width:28%"><span class="d-lab">Tipo de Regime de Apuração do IBS e da CBS</span><div class="d-val norm">— <span class="tag">campo reservado na NT</span></div></div>
+      <div class="d-cell" style="width:28%"><span class="d-lab">Tipo de Regime de Apuração do IBS e da CBS</span><div class="d-val norm">${esc(tpRegimeTexto(d.emit.tpRegimeIBSCBS))}</div></div>
     </div>
     ${(d.procEmi === '4' || d.paa) ? `<div class="d-row"><div class="d-cell" style="flex:1"><span class="d-lab">Processo de emissão</span><div class="d-val norm">4 - PAA (Provedor de Assinatura e Autorização — NT 2026.001)${d.paa ? ` · CNPJ do PAA ${esc(maskDoc(d.paa.cnpj))}${d.paa.assinatura ? ' · assinatura RSA presente' : ' · sem PAASignature'}` : ' · infPAA ausente no XML'}</div></div></div>` : ''}
     <div class="d-sec">Destinatário / remetente</div>

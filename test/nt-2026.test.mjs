@@ -183,9 +183,17 @@ test('NT 2026.008: vProdLiq/vUnComLiq do item e vProdLiqTot do total são lidos'
 });
 
 test('NT 2026.008: vProdLiqTot e ICMSPrevistoPagtoAntecip aparecem no cálculo do imposto', () => {
-  const total = `<ICMSTot><vProd>20.00</vProd><vNF>20.00</vNF><vProdLiqTot>19.00</vProdLiqTot>
-    <ICMSPrevistoPagtoAntecip>0.42</ICMSPrevistoPagtoAntecip></ICMSTot>`;
-  const html = renderDANFE(parseXML(nfe({ total }), 'liqtot.xml'));
+  // NB01 é grupo do ICMS do item (não do ICMSTot). O total líquido acompanha o item.
+  const total = `<ICMSTot><vProd>20.00</vProd><vNF>20.00</vNF><vProdLiqTot>19.00</vProdLiqTot></ICMSTot>`;
+  const imposto = `<imposto>
+    <ICMS><ICMS00><CST>00</CST><vBC>20.00</vBC><pICMS>18.00</pICMS><vICMS>3.60</vICMS></ICMS00>
+      <ICMSPrevistoPagtoAntecip><vICMSPrevisto>0.42</vICMSPrevisto></ICMSPrevistoPagtoAntecip></ICMS>
+  </imposto>`;
+  const ide = '<ide><cUF>35</cUF><natOp>VENDA</natOp><mod>55</mod><serie>1</serie>'
+    + '<nNF>456</nNF><dhEmi>2026-11-20T10:00:00-03:00</dhEmi><tpNF>1</tpNF><tpAmb>1</tpAmb>'
+    + '<tpImp>1</tpImp><tpEmis>1</tpEmis><finNFe>1</finNFe><tpNFDebito>06</tpNFDebito></ide>';
+  const prodExtra = '<vUnComLiq>9.5000</vUnComLiq><vProdLiq>19.00</vProdLiq>';
+  const html = renderDANFE(parseXML(nfe({ total, imposto, ide, prodExtra }), 'liqtot.xml'));
 
   assert.match(html, /V\. produtos líquido/);
   assert.match(html, /ICMS previsto p\/ pagto antecipado/);
@@ -216,7 +224,17 @@ test('NT 2026.010 §4.4: totais condicionais só aparecem quando o XML os traz',
 test('NT 2026.007: emitente sem IE é identificado, sem virar erro de chave', () => {
   const emit = EMIT_ALFA.replace('<CNPJ>12ABC34501DE35</CNPJ>', '<CNPJ>12345678000195</CNPJ>')
     .replace('<IE>123456789</IE>', '');
-  const doc = parseXML(nfe({ emit }), 'semie.xml');
+  // Sem IE, a NF-e é de contribuinte exclusivo do IBS/CBS: o ICMS é vedado (N01-10)
+  // e o grupo IBS/CBS é obrigatório (UB12-11). O XML do teste tem de respeitar isso.
+  const imposto = `<imposto>
+    <IBSCBS><CST>000</CST><cClassTrib>000001</cClassTrib>
+      <gIBSCBS><vBC>20.00</vBC>
+        <gIBSUF><pIBSUF>0.10</pIBSUF><vIBSUF>2.00</vIBSUF></gIBSUF>
+        <gCBS><pCBS>0.90</pCBS><vCBS>18.00</vCBS></gCBS>
+      </gIBSCBS>
+    </IBSCBS>
+  </imposto>`;
+  const doc = parseXML(nfe({ emit, imposto }), 'semie.xml');
   const html = renderDANFE(doc);
 
   assert.equal(doc.emit.IE, '');

@@ -104,6 +104,11 @@ export function nfe({
   /* Grupos que ficam como filho direto de <infNFe> — gPgtoVinc (NT 2026.006) e
      infPAA (NT 2026.001). Ficam fora do `imposto` porque não são tributo. */
   extras = '',
+  /* Campos adicionais do grupo <prod>: vUnComLiq/vProdLiq (NT 2026.008) e
+     cAtivSN (NT 2026.005). */
+  prodExtra = '',
+  /* Grupo <transp> completo, para o CNPJ alfanumérico do transportador. */
+  transp = '',
 } = {}) {
   const id = `NFe${chaveValidaDe()}`.replace(/#/g, '');
   const idFinal = chave === null ? id : `NFe${chave}`;
@@ -114,10 +119,11 @@ ${ide}
 ${emit}
 ${dest}
 <det nItem="1"><prod><cProd>001</cProd><xProd>PRODUTO</xProd><NCM>84713000</NCM><CFOP>5102</CFOP>
-<uCom>UN</uCom><qCom>2.0000</qCom><vUnCom>10.0000</vUnCom><vProd>20.00</vProd></prod>
+<uCom>UN</uCom><qCom>2.0000</qCom><vUnCom>10.0000</vUnCom><vProd>20.00</vProd>${prodExtra}</prod>
 ${imposto}
 </det>
 <total>${total}</total>
+${transp}
 ${extras}
 ${infAdic}
 </infNFe></NFe>

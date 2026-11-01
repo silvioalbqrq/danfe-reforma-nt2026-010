@@ -4,9 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DANFE Reforma Tributária NT 2026.010 — Gerador local XML → DANFE</title>
-<meta name="description" content="Gere o DANFE no layout da Reforma Tributária (NT 2026.010 v1.00 sobre o leiaute da NT 2025.002 v1.52): bloco Total IBS/CBS/IS, cClassTrib, alíquotas e valores por item, CRT do emitente e QR Code. CNPJ alfanumérico (NT 2026.004). 100% local, pronto para GitHub Pages.">
+<meta name="description" content="Gere o DANFE no layout da Reforma Tributária (NT 2026.010 v1.00 sobre o leiaute da NT 2025.002 v1.52): bloco Total IBS/CBS/IS, cClassTrib, alíquotas e valores por item, CRT do emitente e QR Code. Inclui Simples Nacional (NT 2026.005), emitente exclusivo do IBS/CBS sem IE (NT 2026.007), valor líquido e ICMS previsto no pagamento antecipado (NT 2026.008) e CNPJ alfanumérico (NT 2026.004). 100% local, pronto para GitHub Pages.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230f2a4a'/><text x='50' y='68' font-size='48' text-anchor='middle' fill='white' font-family='Arial' font-weight='bold'>D</text></svg>">
-<link rel="stylesheet" href="styles.css?v=20261026-02">
+<link rel="stylesheet" href="styles.css?v=20261101-01">
 <script src="vendor/jsbarcode.min.js"></script>
 <script src="vendor/qrcode.js"></script>
 </head>
@@ -19,7 +19,7 @@
       <div class="corp-logo">D</div>
       <div>
         <strong>DANFE · Reforma Tributária</strong>
-        <small>NT 2026.010 v1.00 &nbsp;•&nbsp; NF-e modelo 55 &nbsp;•&nbsp; DANFE em 01/12/2026 &nbsp;•&nbsp; IBS/CBS obrigatório desde 03/08/2026</small>
+        <small>NT 2026.010 v1.00 + NTs 2026.004/005/007/008 &nbsp;•&nbsp; NF-e modelo 55 &nbsp;•&nbsp; DANFE em 01/12/2026 &nbsp;•&nbsp; IBS/CBS obrigatório desde 03/08/2026</small>
       </div>
     </div>
     <nav class="corp-nav">
@@ -52,6 +52,9 @@
         <li><b>✔</b> Itens com <b>cClassTrib + CST + BC + alíquota + valor</b> (IBS, CBS e IS)</li>
         <li><b>✔</b> <b>CRT do emitente</b> ao lado do CNPJ/IE</li>
         <li><b>✔</b> Chave 44 (alfanumérica, NT 2026.004) + <b>barcode CODE-128</b> + <b>QR Code</b></li>
+        <li><b>✔</b> <b>Simples Nacional</b>: <code>tpRegimeIBSCBS</code>, <code>cAtivSN</code> e <code>gTribSN</code> (NT 2026.005)</li>
+        <li><b>✔</b> <b>Contribuinte exclusivo do IBS/CBS</b> sem IE (NT 2026.007)</li>
+        <li><b>✔</b> <b>Valor líquido</b> do produto e <b>ICMS previsto</b> no pagamento antecipado (NT 2026.008)</li>
         <li><b>✔</b> Faixas <b>HOMOLOGAÇÃO / CONTINGÊNCIA / SEM PROTOCOLO</b></li>
         <li><b>✔</b> Lote, impressão e <b>CSV de conferência</b></li>
       </ul>
@@ -98,12 +101,15 @@
   </section>
 
   <section class="panel" id="layout">
-    <h2>O que mudou no DANFE (NT 2026.010 v1.00)</h2>
-    <p class="lead">Leiaute que demonstra IBS, CBS e Imposto Seletivo no DANFE da NF-e modelo 55, sobre os grupos de IBS/CBS/IS da NT 2025.002 v1.52.</p>
+    <h2>O que mudou no DANFE (NT 2026.010 v1.00 + NTs de outubro/2026)</h2>
+    <p class="lead">Leiaute que demonstra IBS, CBS e Imposto Seletivo no DANFE da NF-e modelo 55, sobre os grupos de IBS/CBS/IS da NT 2025.002 v1.52, com as regras das NTs 2026.004 v1.01, 2026.005 v1.00, 2026.007 v1.11 e 2026.008 v1.01.</p>
     <div class="grid3">
       <div class="feat"><h3>🧾 Novo bloco de totais</h3><p><b>Total do IBS / CBS / IS</b> em quadro próprio após o cálculo do ICMS, com os <b>8 campos</b> do modelo: vIBSUF, vIBSMun, vCBS, vIS e os quatro monofásicos (IBS/CBS mono e mono por retenção). Lidos de <code>IBSCBSTot</code> e <code>ISTot</code>; o que o XML não declara fica em branco.</p></div>
       <div class="feat"><h3>📦 Itens detalhados</h3><p>Cada item traz <b>cClassTrib, CST de IBS/CBS, base, alíquotas e valores</b>, organizados nos três quadros do modelo: <b>Bases de cálculo</b>, <b>Alíquotas</b> e <b>Valor dos tributos</b> — IBS UF, IBS Município, CBS e IS.</p></div>
-      <div class="feat"><h3>🏢 CRT e regime de apuração</h3><p>O <b>CRT</b> aparece com a descrição do código (“3 - Regime Normal”), ao lado do <b>Tipo de Regime de Apuração do IBS e da CBS</b> (campo reservado pela NT). Inclui <b>QR Code</b>, “FOLHA 1/1” e CNPJ/chave <b>alfanuméricos</b> (NT 2026.004).</p></div>
+      <div class="feat"><h3>🏢 CRT e regime de apuração</h3><p>O <b>CRT</b> aparece com a descrição do código (“3 - Regime Normal”), ao lado do <b>Tipo de Regime de Apuração do IBS e da CBS</b> (<code>tpRegimeIBSCBS</code>, NT 2026.005). Inclui <b>QR Code</b>, “FOLHA 1/1” e CNPJ/chave <b>alfanuméricos</b> (NT 2026.004).</p></div>
+      <div class="feat"><h3>🧮 Simples Nacional (NT 2026.005 v1.00)</h3><p>O DANFE lê e imprime <code>tpRegimeIBSCBS</code> do emitente, <code>cAtivSN</code> do item e o grupo <code>gTribSN</code> (IBS/CBS do Simples), tanto por item quanto nos totais de <code>IBSCBSTot</code>. As RVs W59h-10/20, W59i-10 e W59j-10 são conferidas e o MEI (CRT 4) é avisado quando informa o grupo IBSCBS.</p></div>
+      <div class="feat"><h3>🚫 Contribuinte exclusivo do IBS/CBS (NT 2026.007 v1.11)</h3><p>Emitente <b>sem IE</b> é identificado no DANFE como <b>contribuinte exclusivo do IBS/CBS</b>. O gerador confere as RVs N01-10 (ICMS vedado, exceto devolução), UB12-11 (IBS/CBS obrigatório), C17-43 (CNPJ obrigatório) e C18-50 (IEST vedado).</p></div>
+      <div class="feat"><h3>💰 Valor líquido e ICMS antecipado (NT 2026.008 v1.01)</h3><p>O item imprime <code>vUnComLiq</code>/<code>vProdLiq</code> quando declarados, e o total <code>vProdLiqTot</code> entra no cálculo do imposto. O grupo <code>ICMSPrevistoPagtoAntecip</code> é lido do <b>ICMS do item</b> (NB01) e validado por I11c-20, W01a-10/20 e NB01-10/20/30.</p></div>
     </div>
   </section>
 
@@ -115,6 +121,9 @@
       <div class="feat"><h3>NT 2026.006 v1.00 — split payment</h3><p>O grupo <b>YC</b> (<code>gPgtoVinc</code>/<code>gPgto</code>) vincula a nota à transação de pagamento: <code>nPag</code> e <code>idTransacao</code> são <b>atributos</b>; meio de pagamento, CNPJ do recebedor e CNPJ-base do PSP são elementos. O DANFE imprime a vinculação quando ela existe e valida <code>idTransacao</code> duplicado (YC04-20), meio fora de 2 dígitos (YC05-10) e o DV do CNPJ do recebedor (YC06-10).</p></div>
       <div class="feat"><h3>NT 2026.001 v1.02b — PAA</h3><p>Emissão por <b>Provedor de Assinatura e Autorização</b>: <code>procEmi=4</code>, série <b>970-989</b> e grupo <code>infPAA</code> com <code>CNPJPAA</code> e <code>PAASignature</code>. O DANFE identifica a nota como emitida por PAA; as RVs 450, 667, 668, 670, 867 e 893 são conferidas no XML e o número da RV aparece no alerta.</p></div>
       <div class="feat"><h3>IT 2025.002 v1.70 — classificação tributária</h3><p>O <b>cClassTrib</b> tem <b>6 dígitos</b> e os <b>três primeiros são o CST</b> de IBS/CBS. O gerador confere essa forma — e a presença do campo no grupo <code>IBSCBS</code> (UB14) — e imprime também o <code>cClassTribIS</code> do Imposto Seletivo (UB03). A <b>existência</b> do código na tabela vigente não é conferida: a tabela é publicada em portal e em JSON, fora do PDF do IT.</p></div>
+      <div class="feat"><h3>NT 2026.005 v1.00 — Simples Nacional</h3><p>Cria <code>tpRegimeIBSCBS</code> (C21a) e <code>cAtivSN</code> (I17d), e o grupo <code>gTribSN</code> (UB115a) no item e nos totais (<code>total/IBSCBSTot/gTribSN</code>). O DANFE imprime as alíquotas e os valores de IBS/CBS do Simples, confere W59h-10/20, W59i-10 e W59j-10 e avisa quando o MEI (CRT 4) informa o grupo IBSCBS.</p></div>
+      <div class="feat"><h3>NT 2026.007 v1.11 — emissão sem IE</h3><p>O emitente <b>contribuinte exclusivo do IBS/CBS</b> não informa <code>emit/IE</code>. Nesse caso o ICMS é vedado (N01-10, exceto devolução <code>finNFe=4</code>), o grupo <code>det/imposto/IBSCBS</code> é obrigatório (UB12-11), o CNPJ do emitente é obrigatório (C17-43) e o IEST é vedado (C18-50).</p></div>
+      <div class="feat"><h3>NT 2026.008 v1.01 — valor líquido</h3><p>Cria <code>vUnComLiq</code> e <code>vProdLiq</code> no item e <code>vProdLiqTot</code> no total, além do grupo <code>ICMSPrevistoPagtoAntecip</code> (NB01) dentro do ICMS do item. O DANFE imprime os valores líquidos e o ICMS previsto, e confere I11c-20, W01a-10/20 e NB01-10/20/30.</p></div>
       <div class="feat"><h3>MOC 7 Anexo III — contingência</h3><p>Cada modalidade tem texto próprio no DANFE: <b>FS-IA</b> (tpEmis 2), <b>EPEC</b> (4), <b>FS-DA</b> (5), <b>SVC-AN</b> (6) e <b>SVC-RS</b> (7), com o motivo (<code>xJust</code>) e o início (<code>dhCont</code>) impressos. <code>tpEmis=3</code> (SCAN, desativado) e <code>tpEmis=9</code> (contingência offline da NFC-e) são recusados no modelo 55; contingência sem justificativa é erro.</p></div>
     </div>
     <div class="alert">DANFE não tem valor fiscal isolado. A validade jurídica é do <b>XML autorizado</b> (guarde por 5 anos). Consulte pela chave em <b>nfe.fazenda.gov.br/portal</b>. Divergência entre DANFE e XML: vale o XML. <b>Nada é inferido:</b> total ausente no XML sai como “—”.</div>
@@ -124,6 +133,9 @@
     <h2>Perguntas frequentes</h2>
     <details open><summary>Meu XML não tem IBS/CBS/IS. Está errado?</summary><p>Depende da data e do emitente. O preenchimento dos grupos de IBS/CBS é <b>obrigatório em produção desde 03/08/2026</b> para o CRT 3 (Regime Normal); para Simples Nacional, MEI e tributação monofásica a obrigatoriedade começa em 2027 (art. 348 da LC 214/2025). Documento anterior a 03/08/2026 pode não trazer os grupos: o DANFE apenas sinaliza “sem grupos de IBS/CBS/IS no XML”.</p></details>
     <details><summary>E o CNPJ alfanumérico?</summary><p>A NT 2026.004 já está em produção desde <b>01/07/2026</b>: o CNPJ e a chave de acesso podem ter letras. O gerador aceita os dois formatos, mascara o CNPJ corretamente e valida o dígito verificador módulo 11 sobre caracteres alfanuméricos.</p></details>
+    <details><summary>Minha nota é do Simples Nacional. O que o DANFE mostra?</summary><p>O <b>Tipo de Regime de Apuração do IBS e da CBS</b> (<code>tpRegimeIBSCBS</code>), a <b>atividade do Simples</b> (<code>cAtivSN</code>) junto ao item e as alíquotas/valores de <b>IBS e CBS do Simples</b> (<code>gTribSN</code>), por item e nos totais. Se o item trouxer <code>gTribSN</code> e o total não, ou vice-versa, o alerta aponta a RV (W59h-10/20); totais divergentes dos itens apontam W59i-10/W59j-10.</p></details>
+    <details><summary>Posso emitir NF-e sem inscrição estadual?</summary><p>Sim, desde que o emitente seja <b>contribuinte exclusivo do IBS/CBS</b> (NT 2026.007): a ausência de <code>emit/IE</code> identifica essa condição. O DANFE imprime <b>SEM IE · Contribuinte exclusivo do IBS/CBS</b>. Nesse caso o ICMS do item é vedado (exceto devolução), o grupo IBS/CBS é obrigatório, o CNPJ do emitente é obrigatório e o IEST não pode ser informado.</p></details>
+    <details><summary>O que é o valor líquido e o ICMS previsto no pagamento antecipado?</summary><p>A NT 2026.008 criou <code>vUnComLiq</code>/<code>vProdLiq</code> (valor do produto sem tributos) e <code>vProdLiqTot</code> no total, além do grupo <code>ICMSPrevistoPagtoAntecip</code> no ICMS do item. O DANFE imprime esses valores quando o XML os declara e confere: <code>vProdLiq</code> = <code>vUnComLiq</code> × <code>qCom</code> (I11c-20), total líquido presente (W01a-10) e igual à soma dos itens (W01a-20), e o grupo NB01 só em operação de pagamento antecipado (NB01-10/20/30).</p></details>
     <details><summary>Meu XML tem <code>gPgtoVinc</code>? O que o DANFE mostra?</summary><p>Mostra a seção <b>Pagamento vinculado — split payment</b> com número do pagamento, identificador da transação, meio de pagamento e recebedor (CNPJ mascarado). Sem o grupo <code>gPgtoVinc</code> a seção não existe — nada é deduzido do <code>pag</code> tradicional nem do meio de pagamento. O grupo é <b>preparatório</b> na NT 2026.006: o documento continua válido sem ele.</p></details>
     <details><summary>Nota emitida por PAA aparece diferente?</summary><p>Sim: com <code>procEmi=4</code> e <code>infPAA</code> o DANFE ganha a linha <b>Processo de emissão 4 - PAA</b>, com o CNPJ do provedor e a presença da assinatura. Se <code>procEmi=4</code> vier sem <code>infPAA</code>, sem a série 970-989 ou com CNPJ de DV inválido, o alerta aponta a RV correspondente (667, 670 e 867).</p></details>
     <details><summary>O gerador confere se o <code>cClassTrib</code> existe na tabela?</summary><p>Não. O que o IT 2025.002 v1.70 traz em texto é a <b>forma</b>: 6 dígitos, com os três primeiros iguais ao CST de IBS/CBS — é isso que o gerador valida, além da obrigatoriedade do campo. A tabela oficial de códigos é publicada no portal do DF-e e em JSON; conferir a existência exigiria baixar essa tabela, o que o gerador, 100% local, não faz.</p></details>
@@ -135,7 +147,7 @@
     <div class="corp-inner footer-grid">
       <div>
         <strong class="ft">DANFE · Reforma Tributária</strong>
-        <p>Gerador local e open-source, conforme Ajuste SINIEF 07/05, MOC NF-e v7 (Anexo III) e NTs 2026.010 v1.00, 2026.006 v1.00, 2026.001 v1.02b e IT 2025.002 v1.70. O DANFE é auxiliar e sem valor fiscal isolado — a validade jurídica é do XML autorizado.</p>
+        <p>Gerador local e open-source, conforme Ajuste SINIEF 07/05, MOC NF-e v7 (Anexo III) e NTs 2026.010 v1.00, 2026.008 v1.01, 2026.007 v1.11, 2026.006 v1.00, 2026.005 v1.00, 2026.004 v1.01, 2026.001 v1.02b e IT 2025.002 v1.70. O DANFE é auxiliar e sem valor fiscal isolado — a validade jurídica é do XML autorizado.</p>
       </div>
       <div>
         <strong class="ft">Contato</strong>
@@ -155,6 +167,6 @@
   </footer>
 </main>
 
-<script src="app.js?v=20261026-02"></script>
+<script src="app.js?v=20261101-01"></script>
 </body>
 </html>
