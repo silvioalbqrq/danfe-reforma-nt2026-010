@@ -5,8 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DANFE Reforma Tributária NT 2026.010 — Gerador local XML → DANFE</title>
 <meta name="description" content="Gere o DANFE no layout da Reforma Tributária (NT 2026.010 v1.00 sobre o leiaute da NT 2025.002 v1.52): bloco Total IBS/CBS/IS, cClassTrib, alíquotas e valores por item, CRT do emitente e QR Code. Inclui Simples Nacional (NT 2026.005), emitente exclusivo do IBS/CBS sem IE (NT 2026.007), valor líquido e ICMS previsto no pagamento antecipado (NT 2026.008) e CNPJ alfanumérico (NT 2026.004). 100% local, pronto para GitHub Pages.">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230f2a4a'/><text x='50' y='68' font-size='48' text-anchor='middle' fill='white' font-family='Arial' font-weight='bold'>D</text></svg>">
-<link rel="stylesheet" href="styles.css?v=20261101-01">
+<meta name="theme-color" content="#0b1f3a">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="stylesheet" href="styles.css?v=20261111-01">
 <script src="vendor/jsbarcode.min.js"></script>
 <script src="vendor/qrcode.js"></script>
 </head>
@@ -16,10 +20,10 @@
 <header class="corp-bar">
   <div class="corp-inner">
     <div class="corp-brand">
-      <div class="corp-logo">D</div>
+      <div class="corp-logo" aria-hidden="true"><svg viewBox="0 0 32 32"><rect x="6" y="6" width="8" height="8" rx="1.8"/><rect x="18" y="6" width="8" height="8" rx="1.8"/><rect x="6" y="18" width="8" height="8" rx="1.8"/><rect class="hl" x="18" y="18" width="8" height="8" rx="1.8"/></svg></div>
       <div>
         <strong>DANFE · Reforma Tributária</strong>
-        <small>NT 2026.010 v1.00 + NTs 2026.004/005/007/008 &nbsp;•&nbsp; NF-e modelo 55 &nbsp;•&nbsp; DANFE em 01/12/2026 &nbsp;•&nbsp; IBS/CBS obrigatório desde 03/08/2026</small>
+        <small>NT 2026.010 · NF-e modelo 55 · IBS/CBS + IS</small>
       </div>
     </div>
     <nav class="corp-nav">
@@ -158,7 +162,7 @@
         </div>
       </div>
       <div>
-        <strong class="ft">Doações</strong>
+        <strong class="ft">Apoio</strong>
         <p>Pix: <code class="donate-code" id="pix-chave" data-full="8eea81fc-cb40-4150-91fa-6ca829ada37f" title="8eea81fc-cb40-4150-91fa-6ca829ada37f">8eea81fc…da37f</code> <button class="btn-outline-l" data-copy="pix-chave" type="button">Copiar</button><br><small><a href="#" data-reveal="pix-chave" class="reveal-link">ver chave completa</a></small></p>
         <p>Lightning: <code class="donate-code" id="ln-address" data-full="lnbc1p4tt3ccpp5fntekr0ya4r4zd6durklrznte0zsg5jv3zcv83sss4u4efd8d7gsdqqcqzzsxqrrsssp5xg8m0ydtzqprnym2ruqp4260au726czc86p5y2mpl575mp8avdcs9qxpqysgqsjawffjrlkwpa77wf9zvsjx99z833h0dvjqjh0nxqph75rrkghrhzrfwdhj0fqt57l0nwl69c2sgutmm40mgzhkmqy9dpzcje69u09qpaewhvg" title="Invoice única — clique em copiar">lnbc1p4…paewhvg (invoice única)</code> <button class="btn-outline-l" data-copy="ln-address" type="button">Copiar</button><br><small><a href="#" data-reveal="ln-address" class="reveal-link">ver invoice completa</a></small></p>
       </div>
@@ -167,6 +171,6 @@
   </footer>
 </main>
 
-<script src="app.js?v=20261101-02"></script>
+<script src="app.js?v=20261111-01"></script>
 </body>
 </html>
