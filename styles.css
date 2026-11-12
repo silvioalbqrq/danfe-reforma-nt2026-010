@@ -27,8 +27,8 @@ code{background:var(--blue-soft);padding:1px 6px;border-radius:6px;font-size:.9e
 .corp-inner{max-width:1180px;margin:0 auto;padding:0 20px}
 .corp-bar .corp-inner{display:flex;align-items:center;justify-content:space-between;gap:14px;min-height:68px;padding-top:10px;padding-bottom:10px;flex-wrap:wrap}
 .corp-brand{display:flex;gap:11px;align-items:center}
-.corp-logo{width:38px;height:38px;border-radius:11px;background:var(--navy);color:#fff;display:grid;place-items:center;flex:none;box-shadow:0 6px 14px -6px rgba(11,31,58,.6);overflow:hidden}
-.corp-logo img{width:28px;height:28px;display:block}
+.corp-logo{width:38px;height:38px;flex:none;display:grid;place-items:center;box-shadow:0 6px 14px -6px rgba(11,31,58,.6);border-radius:11px;overflow:hidden}
+.corp-logo img{width:38px;height:38px;display:block;border-radius:11px}
 .corp-brand strong{font-size:1.02rem;display:block;line-height:1.2;font-weight:800;letter-spacing:-.02em;color:var(--navy)}
 .corp-brand small{color:var(--muted);font-size:.66rem;font-weight:500;display:block;margin-top:2px}
 .corp-nav{display:flex;gap:18px;align-items:center}
